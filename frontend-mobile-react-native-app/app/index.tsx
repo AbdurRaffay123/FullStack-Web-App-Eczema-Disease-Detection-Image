@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { authService } from '../services/authService';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -12,10 +13,6 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
-
-  // Valid credentials - Fixed the email address
-  const VALID_EMAIL = 'junaidsidhu135@gmail.com';
-  const VALID_PASSWORD = 'junaid12';
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -41,27 +38,16 @@ export default function LoginScreen() {
 
     setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      console.log('Attempting login with:', email, password);
-      console.log('Valid credentials:', VALID_EMAIL, VALID_PASSWORD);
-      
-      if (email.toLowerCase().trim() === VALID_EMAIL.toLowerCase() && password === VALID_PASSWORD) {
-        console.log('Login successful, navigating to tabs');
-        setIsLoading(false);
-        router.replace('/(tabs)');
-      } else {
-        console.log('Login failed - invalid credentials');
-        setIsLoading(false);
-        Alert.alert('Error', 'Invalid email or password. Please try again.');
-      }
-    }, 1000);
-  };
-
-  const fillDemoCredentials = () => {
-    setEmail(VALID_EMAIL);
-    setPassword(VALID_PASSWORD);
-    setErrors({});
+    try {
+      await authService.login({ email, password });
+      Alert.alert('Success', 'Login successful!', [
+        { text: 'OK', onPress: () => router.replace('/(tabs)') }
+      ]);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -157,10 +143,6 @@ export default function LoginScreen() {
                   <Text style={styles.forgotText}>Forgot Password?</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.demoButton} onPress={fillDemoCredentials}>
-                  <Text style={styles.demoText}>Use Demo Credentials</Text>
-                </TouchableOpacity>
-
                 <View style={styles.signupContainer}>
                   <Text style={styles.signupText}>Don't have an account? </Text>
                   <TouchableOpacity onPress={() => router.push('/auth')}>
@@ -168,13 +150,6 @@ export default function LoginScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-
-            {/* Demo Credentials Info */}
-            <View style={styles.credentialsInfo}>
-              <Text style={styles.credentialsTitle}>Demo Credentials:</Text>
-              <Text style={styles.credentialsText}>Email: junaidsidhu135@gmail.com</Text>
-              <Text style={styles.credentialsText}>Password: junaid12</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -315,19 +290,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'OpenSans-Regular',
   },
-  demoButton: {
-    alignItems: 'center',
-    marginTop: 12,
-    backgroundColor: 'rgba(106, 159, 181, 0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  demoText: {
-    color: '#6A9FB5',
-    fontSize: 14,
-    fontFamily: 'OpenSans-SemiBold',
-  },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -342,25 +304,5 @@ const styles = StyleSheet.create({
     color: '#6A9FB5',
     fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
-  },
-  credentialsInfo: {
-    backgroundColor: 'rgba(106, 159, 181, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(106, 159, 181, 0.2)',
-  },
-  credentialsTitle: {
-    color: '#6A9FB5',
-    fontSize: 16,
-    fontFamily: 'OpenSans-SemiBold',
-    marginBottom: 8,
-  },
-  credentialsText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'OpenSans-Regular',
-    marginBottom: 4,
   },
 });

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { authService } from '../services/authService';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -15,10 +16,6 @@ export default function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
-
-  // Valid credentials - Fixed the email address
-  const VALID_EMAIL = 'junaidsidhu135@gmail.com';
-  const VALID_PASSWORD = 'junaid12';
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -55,22 +52,16 @@ export default function AuthScreen() {
 
     setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
+    try {
       if (isLogin) {
-        // Login validation
-        console.log('Attempting login with:', email, password);
-        if (email.toLowerCase().trim() === VALID_EMAIL.toLowerCase() && password === VALID_PASSWORD) {
-          console.log('Login successful, navigating to tabs');
-          setIsLoading(false);
-          router.replace('/(tabs)');
-        } else {
-          console.log('Login failed - invalid credentials');
-          setIsLoading(false);
-          Alert.alert('Error', 'Invalid email or password. Please try again.');
-        }
+        // Login
+        await authService.login({ email, password });
+        Alert.alert('Success', 'Login successful!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]);
       } else {
-        // Sign up - for demo purposes, we'll accept any valid form
+        // Sign up
+        await authService.signup({ name, email, password });
         Alert.alert('Success', 'Account created successfully!', [
           { text: 'OK', onPress: () => {
             setIsLogin(true);
@@ -79,11 +70,14 @@ export default function AuthScreen() {
             setConfirmPassword('');
             setName('');
             setErrors({});
-            setIsLoading(false);
           }}
         ]);
       }
-    }, 1500);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

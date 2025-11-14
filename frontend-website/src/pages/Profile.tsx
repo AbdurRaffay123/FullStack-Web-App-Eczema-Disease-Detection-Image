@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { userService } from '../services/userService';
 import { 
   User, 
   Mail, 
@@ -29,14 +30,16 @@ const Profile: React.FC = () => {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: '+1 (555) 123-4567',
-    dateOfBirth: '1990-05-15',
-    emergencyContact: '+1 (555) 987-6543'
+    fullName: '',
+    email: '',
+    phoneNumber: '',
+    dateOfBirth: '',
   });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -44,37 +47,59 @@ const Profile: React.FC = () => {
     confirmPassword: ''
   });
 
-  const [notifications, setNotifications] = useState({
-    pushNotifications: true,
-    emailReminders: true,
-    weeklyReports: false,
-    appointmentReminders: true,
-    medicationReminders: true
-  });
-
-  const [privacy, setPrivacy] = useState({
-    dataSharing: false,
-    anonymousAnalytics: true,
-    marketingEmails: false,
-    twoFactorAuth: false
-  });
+  // Removed: notifications, dataSharing, anonymousAnalytics, marketingEmails, twoFactorAuth
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'privacy', label: 'Privacy & Security', icon: Shield },
     { id: 'support', label: 'Help & Support', icon: HelpCircle }
   ];
 
-  const handleProfileSave = () => {
-    // Simulate API call
-    setTimeout(() => {
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoadingProfile(true);
+        const profile = await userService.getProfile();
+        setProfileData({
+          fullName: profile.fullName || profile.name || '',
+          email: profile.email || '',
+          phoneNumber: profile.phoneNumber || '',
+          dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
+        });
+      } catch (error: any) {
+        showToast(error.message || 'Failed to load profile', 'error');
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const handleProfileSave = async () => {
+    try {
+      const updatedProfile = await userService.updateProfile({
+        fullName: profileData.fullName,
+        phoneNumber: profileData.phoneNumber,
+        dateOfBirth: profileData.dateOfBirth || null,
+      });
+
+      setProfileData({
+        fullName: updatedProfile.fullName || updatedProfile.name || '',
+        email: updatedProfile.email,
+        phoneNumber: updatedProfile.phoneNumber || '',
+        dateOfBirth: updatedProfile.dateOfBirth ? new Date(updatedProfile.dateOfBirth).toISOString().split('T')[0] : '',
+      });
+
       setIsEditing(false);
       showToast('Profile updated successfully!', 'success');
-    }, 500);
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update profile', 'error');
+    }
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       showToast('New passwords do not match', 'error');
       return;
@@ -85,20 +110,38 @@ const Profile: React.FC = () => {
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
+    if (!passwordData.currentPassword) {
+      showToast('Current password is required', 'error');
+      return;
+    }
+
+    try {
+      await userService.updatePassword({
+        oldPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordForm(false);
       showToast('Password changed successfully!', 'success');
-    }, 500);
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update password', 'error');
+    }
   };
 
-  const handleNotificationSave = () => {
-    showToast('Notification preferences saved!', 'success');
-  };
-
-  const handlePrivacySave = () => {
-    showToast('Privacy settings updated!', 'success');
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await userService.deleteAccount();
+      showToast('Account deleted successfully', 'success');
+      logout();
+      // Redirect to login page
+      window.location.href = '/login';
+    } catch (error: any) {
+      showToast(error.message || 'Failed to delete account', 'error');
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   const renderProfileTab = () => (
@@ -114,87 +157,79 @@ const Profile: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Full Name
-          </label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              value={profileData.name}
-              onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-              disabled={!isEditing}
-              className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
-            />
-          </div>
+      {isLoadingProfile ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A9FB5]"></div>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Full Name
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                value={profileData.fullName}
+                onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
+                disabled={!isEditing}
+                className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
+                placeholder="Enter your full name"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email Address
-          </label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="email"
-              value={profileData.email}
-              onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-              disabled={!isEditing}
-              className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
-            />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Email Address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="email"
+                value={profileData.email}
+                disabled
+                className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 opacity-60 cursor-not-allowed"
+              />
+            </div>
+            <p className="text-gray-400 text-xs mt-1">Email cannot be changed</p>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Phone Number
-          </label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="tel"
-              value={profileData.phone}
-              onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-              disabled={!isEditing}
-              className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
-            />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Phone Number
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="tel"
+                value={profileData.phoneNumber}
+                onChange={(e) => setProfileData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                disabled={!isEditing}
+                className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
+                placeholder="Enter your phone number"
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date of Birth
-          </label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="date"
-              value={profileData.dateOfBirth}
-              onChange={(e) => setProfileData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-              disabled={!isEditing}
-              className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
-            />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Date of Birth
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="date"
+                value={profileData.dateOfBirth}
+                onChange={(e) => setProfileData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                disabled={!isEditing}
+                className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
+              />
+            </div>
           </div>
         </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Emergency Contact
-          </label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="tel"
-              value={profileData.emergencyContact}
-              onChange={(e) => setProfileData(prev => ({ ...prev, emergencyContact: e.target.value }))}
-              disabled={!isEditing}
-              className="w-full pl-10 pr-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] disabled:opacity-60"
-            />
-          </div>
-        </div>
-      </div>
+      )}
 
       {isEditing && (
         <div className="flex space-x-4">
@@ -207,17 +242,25 @@ const Profile: React.FC = () => {
           </button>
         </div>
       )}
+    </div>
+  );
+
+  const renderPrivacyTab = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Privacy & Security</h2>
+      </div>
 
       {/* Password Change Section */}
-      <div className="border-t border-white border-opacity-10 pt-6">
+      <div className="border-b border-white border-opacity-10 pb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Password & Security</h3>
+          <h3 className="text-lg font-semibold text-white">Change Password</h3>
           <button
             onClick={() => setShowPasswordForm(!showPasswordForm)}
             className="flex items-center space-x-2 bg-[#C5B4E3] hover:bg-[#B5A4D3] text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
           >
             <Lock className="h-4 w-4" />
-            <span>Change Password</span>
+            <span>{showPasswordForm ? 'Cancel' : 'Change Password'}</span>
           </button>
         </div>
 
@@ -293,7 +336,10 @@ const Profile: React.FC = () => {
                 Update Password
               </button>
               <button
-                onClick={() => setShowPasswordForm(false)}
+                onClick={() => {
+                  setShowPasswordForm(false);
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                }}
                 className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
               >
                 Cancel
@@ -302,112 +348,69 @@ const Profile: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
-  );
 
-  const renderNotificationsTab = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Notification Preferences</h2>
-        <button
-          onClick={handleNotificationSave}
-          className="flex items-center space-x-2 bg-[#6A9FB5] hover:bg-[#5A8FA5] text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
-        >
-          <Save className="h-4 w-4" />
-          <span>Save Preferences</span>
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {Object.entries(notifications).map(([key, value]) => (
-          <div key={key} className="flex items-center justify-between p-4 bg-white bg-opacity-5 rounded-lg border border-white border-opacity-10">
-            <div>
-              <h3 className="text-white font-medium">
-                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-              </h3>
-              <p className="text-gray-300 text-sm">
-                {key === 'pushNotifications' && 'Receive push notifications on your device'}
-                {key === 'emailReminders' && 'Get email reminders for your skincare routine'}
-                {key === 'weeklyReports' && 'Receive weekly progress reports via email'}
-                {key === 'appointmentReminders' && 'Get notified about upcoming appointments'}
-                {key === 'medicationReminders' && 'Receive medication and treatment reminders'}
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={value}
-                onChange={(e) => setNotifications(prev => ({ ...prev, [key]: e.target.checked }))}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#6A9FB5] peer-focus:ring-opacity-25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6A9FB5]"></div>
-            </label>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderPrivacyTab = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Privacy & Security</h2>
-        <button
-          onClick={handlePrivacySave}
-          className="flex items-center space-x-2 bg-[#6A9FB5] hover:bg-[#5A8FA5] text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
-        >
-          <Save className="h-4 w-4" />
-          <span>Save Settings</span>
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {Object.entries(privacy).map(([key, value]) => (
-          <div key={key} className="flex items-center justify-between p-4 bg-white bg-opacity-5 rounded-lg border border-white border-opacity-10">
-            <div>
-              <h3 className="text-white font-medium">
-                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-              </h3>
-              <p className="text-gray-300 text-sm">
-                {key === 'dataSharing' && 'Allow sharing of anonymized data for research purposes'}
-                {key === 'anonymousAnalytics' && 'Help improve the app with anonymous usage analytics'}
-                {key === 'marketingEmails' && 'Receive promotional emails and product updates'}
-                {key === 'twoFactorAuth' && 'Enable two-factor authentication for enhanced security'}
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={value}
-                onChange={(e) => setPrivacy(prev => ({ ...prev, [key]: e.target.checked }))}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#6A9FB5] peer-focus:ring-opacity-25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6A9FB5]"></div>
-            </label>
-          </div>
-        ))}
-      </div>
-
+      {/* Delete Account Section */}
       <div className="border-t border-white border-opacity-10 pt-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Data Management</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button className="flex items-center space-x-3 p-4 bg-white bg-opacity-5 rounded-lg border border-white border-opacity-10 hover:bg-opacity-10 transition-all">
-            <FileText className="h-5 w-5 text-[#6A9FB5]" />
-            <div className="text-left">
-              <h4 className="text-white font-medium">Export Data</h4>
-              <p className="text-gray-300 text-sm">Download all your data</p>
+        <h3 className="text-lg font-semibold text-white mb-4">Account Management</h3>
+        <div className="bg-red-500 bg-opacity-10 rounded-lg border border-red-500 border-opacity-20 p-6">
+          <div className="flex items-start space-x-4">
+            <AlertTriangle className="h-6 w-6 text-red-400 flex-shrink-0 mt-1" />
+            <div className="flex-1">
+              <h4 className="text-red-300 font-semibold mb-2">Delete Account</h4>
+              <p className="text-red-200 text-sm mb-4">
+                Once you delete your account, there is no going back. Please be certain. All your data will be permanently deleted.
+              </p>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+              >
+                Delete My Account
+              </button>
             </div>
-          </button>
-          
-          <button className="flex items-center space-x-3 p-4 bg-red-500 bg-opacity-10 rounded-lg border border-red-500 border-opacity-20 hover:bg-opacity-20 transition-all">
-            <AlertTriangle className="h-5 w-5 text-red-400" />
-            <div className="text-left">
-              <h4 className="text-red-300 font-medium">Delete Account</h4>
-              <p className="text-red-200 text-sm">Permanently delete your account</p>
-            </div>
-          </button>
+          </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1A1A2E] border border-white border-opacity-20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center space-x-3 mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-400" />
+              <h3 className="text-xl font-bold text-white">Delete Account</h3>
+            </div>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.
+            </p>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setIsDeleting(false);
+                }}
+                disabled={isDeleting}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? (
+                  <span className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </span>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -521,7 +524,6 @@ const Profile: React.FC = () => {
       {/* Tab Content */}
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-8">
         {activeTab === 'profile' && renderProfileTab()}
-        {activeTab === 'notifications' && renderNotificationsTab()}
         {activeTab === 'privacy' && renderPrivacyTab()}
         {activeTab === 'support' && renderSupportTab()}
       </div>

@@ -1,32 +1,62 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, TextInput, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, TextInput, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Settings, Bell, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Shield, ChevronRight, Save, Mail, Phone, Calendar } from 'lucide-react-native';
+import { User, Settings, Bell, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Shield, ChevronRight, Save, Mail, Phone, Calendar, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { authService } from '../../services/authService';
+import { userService } from '../../services/userService';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [profileData, setProfileData] = useState({
-    name: 'Junaid Sidhu',
-    email: 'junaidsidhu135@gmail.com',
-    phone: '+1 (555) 123-4567',
-    dateOfBirth: '1990-01-15',
+    fullName: '',
+    email: '',
+    phoneNumber: '',
+    dateOfBirth: '',
   });
-  const [notifications, setNotifications] = useState({
-    pushNotifications: true,
-    emailNotifications: false,
-    reminderNotifications: true,
-    weeklyReports: true,
-  });
-  const [privacy, setPrivacy] = useState({
-    dataSharing: false,
-    analytics: true,
-    locationTracking: false,
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
 
-  const handleLogout = () => {
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoadingProfile(true);
+        const userData = await authService.getUser();
+        if (userData) {
+          setUser(userData);
+        }
+
+        // Load full profile from backend
+        const profile = await userService.getProfile();
+        setProfileData({
+          fullName: profile.fullName || profile.name || '',
+          email: profile.email || '',
+          phoneNumber: profile.phoneNumber || '',
+          dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
+        });
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Failed to load profile');
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+    loadProfile();
+  }, []);
+  // Removed: notifications, dataSharing, analytics, locationTracking, twoFactorAuth
+
+  const handleLogout = async () => {
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
@@ -35,7 +65,10 @@ export default function ProfileScreen() {
         { 
           text: 'Logout', 
           style: 'destructive',
-          onPress: () => router.replace('/auth')
+          onPress: async () => {
+            await authService.logout();
+            router.replace('/auth');
+          }
         }
       ]
     );
@@ -59,57 +92,115 @@ export default function ProfileScreen() {
     );
   };
 
-  const saveProfile = () => {
-    Alert.alert('Success', 'Profile updated successfully!');
-    setActiveSection(null);
+  const saveProfile = async () => {
+    try {
+      const result = await userService.updateProfile({
+        fullName: profileData.fullName,
+        phoneNumber: profileData.phoneNumber,
+        dateOfBirth: profileData.dateOfBirth || null,
+      });
+
+      setProfileData({
+        fullName: result.user.fullName || result.user.name || '',
+        email: result.user.email,
+        phoneNumber: result.user.phoneNumber || '',
+        dateOfBirth: result.user.dateOfBirth ? new Date(result.user.dateOfBirth).toISOString().split('T')[0] : '',
+      });
+
+      Alert.alert('Success', 'Profile updated successfully!');
+      setActiveSection(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update profile');
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    if (!passwordData.currentPassword) {
+      Alert.alert('Error', 'Current password is required');
+      return;
+    }
+
+    try {
+      await userService.updatePassword({
+        oldPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowPasswordForm(false);
+      Alert.alert('Success', 'Password changed successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update password');
+    }
   };
 
   const renderEditProfile = () => (
     <View style={styles.sectionContent}>
       <Text style={styles.sectionTitle}>Edit Profile</Text>
       
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Full Name</Text>
-        <TextInput
-          style={styles.input}
-          value={profileData.name}
-          onChangeText={(text) => setProfileData({...profileData, name: text})}
-          placeholderTextColor="#666666"
-        />
-      </View>
+      {isLoadingProfile ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              value={profileData.fullName}
+              onChangeText={(text) => setProfileData({...profileData, fullName: text})}
+              placeholder="Enter your full name"
+              placeholderTextColor="#666666"
+            />
+          </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={profileData.email}
-          onChangeText={(text) => setProfileData({...profileData, email: text})}
-          keyboardType="email-address"
-          placeholderTextColor="#666666"
-        />
-      </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={[styles.input, { opacity: 0.6 }]}
+              value={profileData.email}
+              editable={false}
+              keyboardType="email-address"
+              placeholderTextColor="#666666"
+            />
+            <Text style={styles.helperText}>Email cannot be changed</Text>
+          </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Phone</Text>
-        <TextInput
-          style={styles.input}
-          value={profileData.phone}
-          onChangeText={(text) => setProfileData({...profileData, phone: text})}
-          keyboardType="phone-pad"
-          placeholderTextColor="#666666"
-        />
-      </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <TextInput
+              style={styles.input}
+              value={profileData.phoneNumber}
+              onChangeText={(text) => setProfileData({...profileData, phoneNumber: text})}
+              keyboardType="phone-pad"
+              placeholder="Enter your phone number"
+              placeholderTextColor="#666666"
+            />
+          </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Date of Birth</Text>
-        <TextInput
-          style={styles.input}
-          value={profileData.dateOfBirth}
-          onChangeText={(text) => setProfileData({...profileData, dateOfBirth: text})}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#666666"
-        />
-      </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Date of Birth</Text>
+            <TextInput
+              style={styles.input}
+              value={profileData.dateOfBirth}
+              onChangeText={(text) => setProfileData({...profileData, dateOfBirth: text})}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#666666"
+            />
+          </View>
+        </>
+      )}
 
       <TouchableOpacity style={styles.saveButton} onPress={saveProfile}>
         <Save size={20} color="#FFFFFF" />
@@ -118,93 +209,181 @@ export default function ProfileScreen() {
     </View>
   );
 
-  const renderNotifications = () => (
-    <View style={styles.sectionContent}>
-      <Text style={styles.sectionTitle}>Notification Settings</Text>
-      
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Push Notifications</Text>
-        <Switch
-          value={notifications.pushNotifications}
-          onValueChange={(value) => setNotifications({...notifications, pushNotifications: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={notifications.pushNotifications ? '#FFFFFF' : '#CCCCCC'}
-        />
-      </View>
-
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Email Notifications</Text>
-        <Switch
-          value={notifications.emailNotifications}
-          onValueChange={(value) => setNotifications({...notifications, emailNotifications: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={notifications.emailNotifications ? '#FFFFFF' : '#CCCCCC'}
-        />
-      </View>
-
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Reminder Notifications</Text>
-        <Switch
-          value={notifications.reminderNotifications}
-          onValueChange={(value) => setNotifications({...notifications, reminderNotifications: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={notifications.reminderNotifications ? '#FFFFFF' : '#CCCCCC'}
-        />
-      </View>
-
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Weekly Reports</Text>
-        <Switch
-          value={notifications.weeklyReports}
-          onValueChange={(value) => setNotifications({...notifications, weeklyReports: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={notifications.weeklyReports ? '#FFFFFF' : '#CCCCCC'}
-        />
-      </View>
-    </View>
-  );
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await userService.deleteAccount();
+      await authService.logout();
+      router.replace('/auth');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to delete account');
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   const renderPrivacySecurity = () => (
     <View style={styles.sectionContent}>
       <Text style={styles.sectionTitle}>Privacy & Security</Text>
       
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Data Sharing</Text>
-        <Switch
-          value={privacy.dataSharing}
-          onValueChange={(value) => setPrivacy({...privacy, dataSharing: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={privacy.dataSharing ? '#FFFFFF' : '#CCCCCC'}
-        />
+      {/* Password Change Section */}
+      <View style={styles.passwordSection}>
+        <View style={styles.passwordHeader}>
+          <Text style={styles.passwordTitle}>Change Password</Text>
+          <TouchableOpacity 
+            style={styles.passwordToggleButton}
+            onPress={() => setShowPasswordForm(!showPasswordForm)}
+          >
+            <Lock size={20} color="#6A9FB5" />
+            <Text style={styles.passwordToggleText}>
+              {showPasswordForm ? 'Cancel' : 'Change Password'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {showPasswordForm && (
+          <View style={styles.passwordForm}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Current Password</Text>
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={passwordData.currentPassword}
+                  onChangeText={(text) => setPasswordData({...passwordData, currentPassword: text})}
+                  secureTextEntry={!showCurrentPassword}
+                  placeholder="Enter current password"
+                  placeholderTextColor="#666666"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showCurrentPassword ? (
+                    <EyeOff size={20} color="#6A9FB5" />
+                  ) : (
+                    <Eye size={20} color="#6A9FB5" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>New Password</Text>
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={passwordData.newPassword}
+                  onChangeText={(text) => setPasswordData({...passwordData, newPassword: text})}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="Enter new password"
+                  placeholderTextColor="#666666"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showNewPassword ? (
+                    <EyeOff size={20} color="#6A9FB5" />
+                  ) : (
+                    <Eye size={20} color="#6A9FB5" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirm New Password</Text>
+              <TextInput
+                style={styles.input}
+                value={passwordData.confirmPassword}
+                onChangeText={(text) => setPasswordData({...passwordData, confirmPassword: text})}
+                secureTextEntry
+                placeholder="Confirm new password"
+                placeholderTextColor="#666666"
+              />
+            </View>
+
+            <View style={styles.passwordButtonContainer}>
+              <TouchableOpacity
+                style={styles.passwordSaveButton}
+                onPress={handlePasswordChange}
+              >
+                <Text style={styles.passwordSaveButtonText}>Update Password</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.passwordCancelButton}
+                onPress={() => {
+                  setShowPasswordForm(false);
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                }}
+              >
+                <Text style={styles.passwordCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Analytics</Text>
-        <Switch
-          value={privacy.analytics}
-          onValueChange={(value) => setPrivacy({...privacy, analytics: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={privacy.analytics ? '#FFFFFF' : '#CCCCCC'}
-        />
+      {/* Delete Account Section */}
+      <View style={styles.deleteAccountSection}>
+        <Text style={styles.sectionTitle}>Account Management</Text>
+        <View style={styles.deleteAccountCard}>
+          <AlertTriangle size={24} color="#DC3545" />
+          <View style={styles.deleteAccountContent}>
+            <Text style={styles.deleteAccountTitle}>Delete Account</Text>
+            <Text style={styles.deleteAccountDescription}>
+              Once you delete your account, there is no going back. Please be certain. All your data will be permanently deleted.
+            </Text>
+            <TouchableOpacity
+              style={styles.deleteAccountButton}
+              onPress={() => setShowDeleteConfirm(true)}
+            >
+              <Text style={styles.deleteAccountButtonText}>Delete My Account</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Location Tracking</Text>
-        <Switch
-          value={privacy.locationTracking}
-          onValueChange={(value) => setPrivacy({...privacy, locationTracking: value})}
-          trackColor={{ false: '#444444', true: '#6A9FB5' }}
-          thumbColor={privacy.locationTracking ? '#FFFFFF' : '#CCCCCC'}
-        />
-      </View>
-
-      <TouchableOpacity style={styles.actionButton}>
-        <Text style={styles.actionButtonText}>Change Password</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.actionButton}>
-        <Text style={styles.actionButtonText}>Two-Factor Authentication</Text>
-      </TouchableOpacity>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AlertTriangle size={24} color="#DC3545" />
+              <Text style={styles.modalTitle}>Delete Account</Text>
+            </View>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setIsDeleting(false);
+                }}
+                disabled={isDeleting}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalDeleteButton, isDeleting && styles.modalDeleteButtonDisabled]}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.modalDeleteButtonText}>Deleting...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.modalDeleteButtonText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 
@@ -248,13 +427,6 @@ export default function ProfileScreen() {
       onPress: () => setActiveSection(activeSection === 'edit-profile' ? null : 'edit-profile'),
     },
     {
-      id: 'notifications',
-      title: 'Notifications',
-      subtitle: 'Manage your notification preferences',
-      icon: Bell,
-      onPress: () => setActiveSection(activeSection === 'notifications' ? null : 'notifications'),
-    },
-    {
       id: 'privacy',
       title: 'Privacy & Security',
       subtitle: 'Manage your privacy settings',
@@ -295,8 +467,8 @@ export default function ProfileScreen() {
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>Junaid Sidhu</Text>
-              <Text style={styles.profileEmail}>junaidsidhu135@gmail.com</Text>
+              <Text style={styles.profileName}>{profileData.name || 'User'}</Text>
+              <Text style={styles.profileEmail}>{profileData.email || ''}</Text>
               <Text style={styles.memberSince}>Member since January 2025</Text>
             </View>
           </View>
@@ -345,7 +517,6 @@ export default function ProfileScreen() {
                 {activeSection === item.id && (
                   <>
                     {item.id === 'edit-profile' && renderEditProfile()}
-                    {item.id === 'notifications' && renderNotifications()}
                     {item.id === 'privacy' && renderPrivacySecurity()}
                     {item.id === 'help' && renderHelpSupport()}
                   </>
@@ -685,5 +856,225 @@ const styles = StyleSheet.create({
     color: '#888888',
     marginBottom: 4,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+  },
+  helperText: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-Regular',
+    color: '#888888',
+    marginTop: 4,
+  },
+  passwordForm: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+  },
+  eyeButton: {
+    padding: 12,
+  },
+  passwordButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  passwordSaveButton: {
+    flex: 1,
+    backgroundColor: '#6A9FB5',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  passwordSaveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  passwordCancelButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  passwordCancelButtonText: {
+    color: '#B0B0B0',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  passwordSection: {
+    marginBottom: 24,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  passwordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  passwordTitle: {
+    fontSize: 18,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFFFFF',
+  },
+  passwordToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(106, 159, 181, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  passwordToggleText: {
+    color: '#6A9FB5',
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  deleteAccountSection: {
+    marginTop: 24,
+  },
+  deleteAccountCard: {
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(220, 53, 69, 0.2)',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteAccountContent: {
+    flex: 1,
+  },
+  deleteAccountTitle: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#DC3545',
+    marginBottom: 8,
+  },
+  deleteAccountDescription: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFB3B3',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  deleteAccountButton: {
+    backgroundColor: '#DC3545',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  deleteAccountButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: '#1A1A2E',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFFFFF',
+  },
+  modalMessage: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalCancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  modalDeleteButton: {
+    flex: 1,
+    backgroundColor: '#DC3545',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalDeleteButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalDeleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
   },
 });

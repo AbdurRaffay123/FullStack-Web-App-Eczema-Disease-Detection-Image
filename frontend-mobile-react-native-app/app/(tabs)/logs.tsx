@@ -1,74 +1,203 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { Plus, Calendar, MapPin, Thermometer, Droplets } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import { Plus, Calendar, MapPin, Edit, Trash2, X, AlertCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
+import { symptomService, SymptomLog as SymptomLogType } from '../../services/symptomService';
 
 export default function LogsScreen() {
   const [showLogForm, setShowLogForm] = useState(false);
-  const [itchiness, setItchiness] = useState(3);
-  const [selectedArea, setSelectedArea] = useState('');
-  const [notes, setNotes] = useState('');
+  const [logs, setLogs] = useState<SymptomLogType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [formData, setFormData] = useState({
+    itchinessLevel: 5,
+    affectedArea: '',
+    possibleTriggers: '',
+    additionalNotes: ''
+  });
 
-  const areas = ['Face', 'Arms', 'Legs', 'Chest', 'Back', 'Hands'];
-  const triggers = ['Stress', 'Weather', 'Food', 'Soap', 'Fabric', 'Other'];
-  const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
+  const areas = ['Face', 'Neck', 'Arms', 'Forearm', 'Hands', 'Chest', 'Back', 'Legs', 'Feet', 'Other'];
+  const triggers = ['Stress', 'Dry weather', 'Humid weather', 'New soap', 'New detergent', 'Certain foods', 'Pet dander', 'Dust', 'Pollen', 'Fabric softener'];
 
-  const logs = [
-    {
-      id: 1,
-      date: '2025-01-15',
-      itchiness: 4,
-      area: 'Arms',
-      triggers: ['Weather', 'Stress'],
-      notes: 'Flare-up after cold weather exposure',
-    },
-    {
-      id: 2,
-      date: '2025-01-14',
-      itchiness: 2,
-      area: 'Face',
-      triggers: ['Soap'],
-      notes: 'Mild irritation after using new cleanser',
-    },
-    {
-      id: 3,
-      date: '2025-01-13',
-      itchiness: 5,
-      area: 'Legs',
-      triggers: ['Fabric', 'Stress'],
-      notes: 'Severe reaction to wool clothing',
-    },
-  ];
+  useEffect(() => {
+    loadLogs();
+  }, []);
 
-  const toggleTrigger = (trigger: string) => {
-    setSelectedTriggers(prev => 
-      prev.includes(trigger) 
-        ? prev.filter(t => t !== trigger)
-        : [...prev, trigger]
-    );
+  const loadLogs = async () => {
+    try {
+      setIsLoading(true);
+      const result = await symptomService.getLogs();
+      setLogs(result.logs);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to load logs');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const saveLog = () => {
-    if (!selectedArea) {
+  const saveLog = async () => {
+    if (!formData.affectedArea) {
       Alert.alert('Error', 'Please select an affected area');
       return;
     }
 
-    // Here you would save to your backend
-    Alert.alert('Success', 'Log saved successfully!');
+    if (formData.itchinessLevel < 1 || formData.itchinessLevel > 10) {
+      Alert.alert('Error', 'Itchiness level must be between 1 and 10');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (editingId) {
+        await symptomService.updateLog(editingId, formData);
+        Alert.alert('Success', 'Log updated successfully!');
+        setEditingId(null);
+      } else {
+        await symptomService.createLog(formData);
+        Alert.alert('Success', 'Log saved successfully!');
+      }
+      
+      resetForm();
+      loadLogs();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save log');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEdit = (log: SymptomLogType) => {
+    setFormData({
+      itchinessLevel: log.itchinessLevel,
+      affectedArea: log.affectedArea,
+      possibleTriggers: log.possibleTriggers || '',
+      additionalNotes: log.additionalNotes || ''
+    });
+    setEditingId(log.id);
+    setShowLogForm(true);
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
+
+    setIsDeleting(true);
+    try {
+      await symptomService.deleteLog(deleteId);
+      loadLogs();
+      setDeleteId(null);
+    } catch (error: any) {
+      // Error will be shown via toast or error handling
+      console.error('Delete error:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteId(null);
+    setIsDeleting(false);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      itchinessLevel: 5,
+      affectedArea: '',
+      possibleTriggers: '',
+      additionalNotes: ''
+    });
+    setEditingId(null);
     setShowLogForm(false);
-    setItchiness(3);
-    setSelectedArea('');
-    setNotes('');
-    setSelectedTriggers([]);
+  };
+
+  const addTrigger = (trigger: string) => {
+    const currentTriggers = formData.possibleTriggers ? formData.possibleTriggers.split(',').map(t => t.trim()).filter(t => t) : [];
+    if (!currentTriggers.includes(trigger)) {
+      setFormData(prev => ({
+        ...prev,
+        possibleTriggers: currentTriggers.length > 0 ? `${prev.possibleTriggers}, ${trigger}` : trigger
+      }));
+    }
   };
 
   const getItchinessLabel = (value: number) => {
-    const labels = ['None', 'Mild', 'Moderate', 'Severe', 'Extreme'];
-    return labels[value - 1] || 'Moderate';
+    if (value <= 2) return 'Very Mild';
+    if (value <= 4) return 'Mild';
+    if (value <= 6) return 'Moderate';
+    if (value <= 8) return 'Severe';
+    return 'Very Severe';
   };
+
+  const getItchinessColor = (level: number) => {
+    if (level <= 3) return '#28A745';
+    if (level <= 6) return '#FFA500';
+    return '#DC3545';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const renderLogItem = ({ item }: { item: SymptomLogType }) => (
+    <View style={styles.logCard}>
+      <View style={styles.logHeader}>
+        <View style={styles.logDate}>
+          <Calendar size={16} color="#6A9FB5" />
+          <Text style={styles.logDateText}>{formatDate(item.createdAt)}</Text>
+        </View>
+        <View style={styles.logActions}>
+          <TouchableOpacity
+            onPress={() => handleEdit(item)}
+            style={styles.actionButton}
+          >
+            <Edit size={16} color="#6A9FB5" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleDeleteClick(item.id)}
+            style={styles.actionButton}
+          >
+            <Trash2 size={16} color="#DC3545" />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      <View style={styles.logContent}>
+        <View style={styles.logDetailRow}>
+          <View style={styles.itchinessIndicator}>
+            <Text style={styles.itchinessText}>Level {item.itchinessLevel}/10</Text>
+            <View style={[styles.itchinessDot, { backgroundColor: getItchinessColor(item.itchinessLevel) }]} />
+          </View>
+          <View style={styles.logDetail}>
+            <MapPin size={14} color="#B0B0B0" />
+            <Text style={styles.logDetailText}>{item.affectedArea}</Text>
+          </View>
+        </View>
+        
+        {item.possibleTriggers && item.possibleTriggers.trim() && (
+          <View style={styles.triggersContainer}>
+            <Text style={styles.triggerLabel}>Triggers:</Text>
+            <Text style={styles.triggerText}>{item.possibleTriggers}</Text>
+          </View>
+        )}
+        
+        {item.additionalNotes && item.additionalNotes.trim() && (
+          <Text style={styles.logNotes}>{item.additionalNotes}</Text>
+        )}
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -80,54 +209,63 @@ export default function LogsScreen() {
           <Text style={styles.title}>Symptom Logs</Text>
           <TouchableOpacity 
             style={styles.addButton}
-            onPress={() => setShowLogForm(!showLogForm)}
+            onPress={() => {
+              if (showLogForm) {
+                resetForm();
+              } else {
+                setShowLogForm(true);
+              }
+            }}
           >
-            <Plus size={24} color="#FFFFFF" />
+            {showLogForm ? <X size={24} color="#FFFFFF" /> : <Plus size={24} color="#FFFFFF" />}
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {showLogForm && (
             <View style={styles.logForm}>
-              <Text style={styles.formTitle}>New Symptom Log</Text>
+              <Text style={styles.formTitle}>
+                {editingId ? 'Edit Symptom Log' : 'New Symptom Log'}
+              </Text>
               
               <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Itchiness Level</Text>
+                <Text style={styles.formLabel}>
+                  Itchiness Level: {formData.itchinessLevel}/10 ({getItchinessLabel(formData.itchinessLevel)})
+                </Text>
                 <View style={styles.sliderContainer}>
-                  <Text style={styles.sliderValue}>{getItchinessLabel(itchiness)}</Text>
                   <Slider
                     style={styles.slider}
                     minimumValue={1}
-                    maximumValue={5}
+                    maximumValue={10}
                     step={1}
-                    value={itchiness}
-                    onValueChange={setItchiness}
+                    value={formData.itchinessLevel}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, itchinessLevel: value }))}
                     minimumTrackTintColor="#6A9FB5"
                     maximumTrackTintColor="#444444"
                     thumbStyle={{ backgroundColor: '#6A9FB5' }}
                   />
                   <View style={styles.sliderLabels}>
-                    <Text style={styles.sliderLabelText}>Mild</Text>
-                    <Text style={styles.sliderLabelText}>Extreme</Text>
+                    <Text style={styles.sliderLabelText}>1 - Very Mild</Text>
+                    <Text style={styles.sliderLabelText}>10 - Unbearable</Text>
                   </View>
                 </View>
               </View>
 
               <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Affected Area</Text>
+                <Text style={styles.formLabel}>Affected Area <Text style={styles.required}>*</Text></Text>
                 <View style={styles.areaGrid}>
                   {areas.map((area) => (
                     <TouchableOpacity
                       key={area}
                       style={[
                         styles.areaChip,
-                        selectedArea === area && styles.areaChipSelected
+                        formData.affectedArea === area && styles.areaChipSelected
                       ]}
-                      onPress={() => setSelectedArea(area)}
+                      onPress={() => setFormData(prev => ({ ...prev, affectedArea: area }))}
                     >
                       <Text style={[
                         styles.areaChipText,
-                        selectedArea === area && styles.areaChipTextSelected
+                        formData.affectedArea === area && styles.areaChipTextSelected
                       ]}>
                         {area}
                       </Text>
@@ -142,93 +280,135 @@ export default function LogsScreen() {
                   {triggers.map((trigger) => (
                     <TouchableOpacity
                       key={trigger}
-                      style={[
-                        styles.triggerChip,
-                        selectedTriggers.includes(trigger) && styles.triggerChipSelected
-                      ]}
-                      onPress={() => toggleTrigger(trigger)}
+                      style={styles.triggerChip}
+                      onPress={() => addTrigger(trigger)}
                     >
-                      <Text style={[
-                        styles.triggerChipText,
-                        selectedTriggers.includes(trigger) && styles.triggerChipTextSelected
-                      ]}>
-                        {trigger}
-                      </Text>
+                      <Text style={styles.triggerChipText}>{trigger}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
+                <TextInput
+                  style={styles.triggerInput}
+                  placeholder="Enter triggers (comma-separated)"
+                  placeholderTextColor="#666666"
+                  value={formData.possibleTriggers}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, possibleTriggers: text }))}
+                  multiline
+                />
               </View>
 
               <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Notes</Text>
+                <Text style={styles.formLabel}>Additional Notes</Text>
                 <TextInput
                   style={styles.notesInput}
                   placeholder="Add any additional notes..."
                   placeholderTextColor="#666666"
-                  value={notes}
-                  onChangeText={setNotes}
+                  value={formData.additionalNotes}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, additionalNotes: text }))}
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
                 />
               </View>
 
-              <LinearGradient
-                colors={['#6A9FB5', '#C5B4E3']}
-                style={styles.saveButton}
-              >
-                <TouchableOpacity onPress={saveLog} style={styles.saveButtonTouchable}>
-                  <Text style={styles.saveButtonText}>Save Log</Text>
-                </TouchableOpacity>
-              </LinearGradient>
+              <View style={styles.formButtons}>
+                {editingId && (
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={resetForm}
+                    disabled={isSubmitting}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
+                <LinearGradient
+                  colors={['#6A9FB5', '#C5B4E3']}
+                  style={[styles.saveButton, editingId && styles.saveButtonFlex]}
+                >
+                  <TouchableOpacity
+                    onPress={saveLog}
+                    style={styles.saveButtonTouchable}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text style={styles.saveButtonText}>Saving...</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.saveButtonText}>
+                        {editingId ? 'Update Log' : 'Save Log'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </LinearGradient>
+              </View>
             </View>
           )}
 
           <View style={styles.logsContainer}>
             <Text style={styles.sectionTitle}>Recent Logs</Text>
-            {logs.map((log) => (
-              <View key={log.id} style={styles.logCard}>
-                <View style={styles.logHeader}>
-                  <View style={styles.logDate}>
-                    <Calendar size={16} color="#6A9FB5" />
-                    <Text style={styles.logDateText}>{log.date}</Text>
-                  </View>
-                  <View style={styles.itchinessIndicator}>
-                    <Text style={styles.itchinessText}>{getItchinessLabel(log.itchiness)}</Text>
-                    <View style={[styles.itchinessDot, { backgroundColor: getItchinessColor(log.itchiness) }]} />
-                  </View>
-                </View>
-                
-                <View style={styles.logContent}>
-                  <View style={styles.logDetail}>
-                    <MapPin size={14} color="#B0B0B0" />
-                    <Text style={styles.logDetailText}>{log.area}</Text>
-                  </View>
-                  
-                  <View style={styles.triggersContainer}>
-                    {log.triggers.map((trigger) => (
-                      <View key={trigger} style={styles.triggerTag}>
-                        <Text style={styles.triggerTagText}>{trigger}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  
-                  {log.notes && (
-                    <Text style={styles.logNotes}>{log.notes}</Text>
-                  )}
-                </View>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#6A9FB5" />
+                <Text style={styles.loadingText}>Loading logs...</Text>
               </View>
-            ))}
+            ) : logs.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No symptom logs yet. Start tracking your symptoms!</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={logs}
+                renderItem={renderLogItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
           </View>
         </ScrollView>
       </LinearGradient>
+
+      {/* Delete Confirmation Modal */}
+      {deleteId && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AlertCircle size={24} color="#DC3545" />
+              <Text style={styles.modalTitle}>Delete Symptom Log</Text>
+            </View>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to delete this symptom log? This action cannot be undone.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={handleDeleteCancel}
+                disabled={isDeleting}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalDeleteButton, isDeleting && styles.modalDeleteButtonDisabled]}
+                onPress={handleDeleteConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.modalDeleteButtonText}>Deleting...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.modalDeleteButtonText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
-}
-
-function getItchinessColor(level: number) {
-  const colors = ['#28A745', '#FFA500', '#FF6B35', '#DC3545', '#8B0000'];
-  return colors[level - 1] || '#FFA500';
 }
 
 const styles = StyleSheet.create({
@@ -244,7 +424,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    backdropFilter: 'blur(10px)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -303,14 +482,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 12,
   },
+  required: {
+    color: '#DC3545',
+  },
   sliderContainer: {
     alignItems: 'center',
-  },
-  sliderValue: {
-    fontSize: 18,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#6A9FB5',
-    marginBottom: 8,
   },
   slider: {
     width: '100%',
@@ -321,6 +497,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 16,
+    marginTop: 8,
   },
   sliderLabelText: {
     fontSize: 12,
@@ -351,11 +528,13 @@ const styles = StyleSheet.create({
   },
   areaChipTextSelected: {
     color: '#FFFFFF',
+    fontFamily: 'OpenSans-SemiBold',
   },
   triggerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 12,
   },
   triggerChip: {
     paddingHorizontal: 12,
@@ -365,17 +544,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  triggerChipSelected: {
-    backgroundColor: '#C5B4E3',
-    borderColor: '#C5B4E3',
-  },
   triggerChipText: {
     fontSize: 12,
     fontFamily: 'OpenSans-Regular',
     color: '#B0B0B0',
   },
-  triggerChipTextSelected: {
+  triggerInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     color: '#FFFFFF',
+    minHeight: 60,
   },
   notesInput: {
     borderWidth: 1,
@@ -388,9 +571,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     minHeight: 80,
   },
+  formButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+  },
   saveButton: {
     borderRadius: 12,
-    marginTop: 8,
     shadowColor: '#6A9FB5',
     shadowOffset: {
       width: 0,
@@ -399,6 +600,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
+  },
+  saveButtonFlex: {
+    flex: 1,
   },
   saveButtonTouchable: {
     paddingVertical: 16,
@@ -409,6 +613,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
   },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   logsContainer: {
     padding: 16,
   },
@@ -417,6 +626,22 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans-SemiBold',
     color: '#FFFFFF',
     marginBottom: 16,
+  },
+  emptyContainer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    textAlign: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginTop: 12,
   },
   logCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -450,23 +675,38 @@ const styles = StyleSheet.create({
     color: '#B0B0B0',
     marginLeft: 6,
   },
+  logActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  logContent: {
+    gap: 8,
+  },
+  logDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   itchinessIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   itchinessText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
     color: '#FFFFFF',
     marginRight: 8,
   },
   itchinessDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  logContent: {
-    gap: 8,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   logDetail: {
     flexDirection: 'row',
@@ -479,25 +719,103 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   triggersContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    marginTop: 8,
   },
-  triggerTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(106, 159, 181, 0.2)',
+  triggerLabel: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#B0B0B0',
+    marginBottom: 4,
   },
-  triggerTagText: {
-    fontSize: 12,
+  triggerText: {
+    fontSize: 14,
     fontFamily: 'OpenSans-Regular',
-    color: '#6A9FB5',
+    color: '#FFFFFF',
   },
   logNotes: {
     fontSize: 14,
     fontFamily: 'OpenSans-Regular',
     color: '#B0B0B0',
     fontStyle: 'italic',
+    marginTop: 8,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: '#1A1A2E',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFFFFF',
+    marginLeft: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalCancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  modalDeleteButton: {
+    flex: 1,
+    backgroundColor: '#DC3545',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalDeleteButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalDeleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
   },
 });

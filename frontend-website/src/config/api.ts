@@ -25,7 +25,8 @@ export const API_ENDPOINTS = {
   // Authentication
   AUTH: {
     LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
+    SIGNUP: '/auth/signup',
+    REGISTER: '/auth/signup', // Alias for SIGNUP
     LOGOUT: '/auth/logout',
     REFRESH: '/auth/refresh',
     PROFILE: '/auth/profile',
@@ -33,18 +34,20 @@ export const API_ENDPOINTS = {
   
   // User Management
   USER: {
-    PROFILE: '/users/profile',
-    UPDATE: '/users/update',
-    PASSWORD: '/users/password',
+    PROFILE: '/users/me',
+    UPDATE: '/users/update-profile',
+    PASSWORD: '/users/update-password',
+    DELETE: '/users/delete-account',
   },
   
   // Eczema Care Features
   SYMPTOMS: {
-    LIST: '/symptoms',
-    CREATE: '/symptoms',
-    UPDATE: '/symptoms/:id',
-    DELETE: '/symptoms/:id',
-    STATS: '/symptoms/stats',
+    LIST: '/logs',
+    CREATE: '/logs',
+    GET: '/logs/:id',
+    UPDATE: '/logs/:id',
+    DELETE: '/logs/:id',
+    STATS: '/logs/stats',
   },
   
   IMAGES: {

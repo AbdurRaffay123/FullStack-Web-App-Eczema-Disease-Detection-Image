@@ -23,18 +23,8 @@ export interface RequestOptions {
 
 class ApiClient {
   private getAuthToken(): string | null {
-    // Get token from localStorage or sessionStorage
-    // TODO: Consider using httpOnly cookies for better security
-    const userData = localStorage.getItem('eczema_user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        return user.token || null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
+    // Get token from localStorage
+    return localStorage.getItem('eczema_token');
   }
 
   private async request<T>(

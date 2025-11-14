@@ -47,11 +47,6 @@ const Login: React.FC = () => {
     }
   };
 
-  const useDemoCredentials = () => {
-    setEmail('junaidsidhu135@gmail.com');
-    setPassword('junaid12');
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
@@ -122,14 +117,6 @@ const Login: React.FC = () => {
             ) : (
               'Sign In'
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={useDemoCredentials}
-            className="w-full bg-[#C5B4E3] hover:bg-[#B5A4D3] text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-          >
-            Use Demo Credentials
           </button>
         </form>
 

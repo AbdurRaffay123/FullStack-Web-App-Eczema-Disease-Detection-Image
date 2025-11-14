@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Heart, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
@@ -13,7 +14,7 @@ const SignUp: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
+  const { signup, isLoading } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -49,15 +50,14 @@ const SignUp: React.FC = () => {
     
     if (!validateForm()) return;
     
-    setIsLoading(true);
+    const success = await signup(formData.name, formData.email, formData.password);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    showToast('Account created successfully!', 'success');
-    navigate('/login');
-    
-    setIsLoading(false);
+    if (success) {
+      showToast('Account created successfully!', 'success');
+      navigate('/dashboard');
+    } else {
+      showToast('Signup failed. Please try again.', 'error');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
