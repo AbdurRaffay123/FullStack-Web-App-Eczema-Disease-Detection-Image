@@ -13,129 +13,444 @@ interface Tip {
 const Tips: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSeverity, setSelectedSeverity] = useState<'Low' | 'Moderate' | 'High'>('Low');
   const [expandedTip, setExpandedTip] = useState<string | null>(null);
 
   const categories = ['All', 'Skincare', 'Lifestyle', 'Weather', 'Diet', 'Prevention'];
 
-  const tips: Tip[] = [
-    {
-      id: '1',
-      title: 'Daily Moisturizing Routine',
-      category: 'Skincare',
-      content: `Proper moisturizing is crucial for managing eczema. Apply a fragrance-free, hypoallergenic moisturizer immediately after bathing while your skin is still damp. This helps lock in moisture and create a protective barrier.
+  // Tips organized by severity level
+  const tipsBySeverity = {
+    Low: [
+      {
+        id: 'low-1',
+        title: 'Daily Moisturizing Routine',
+        category: 'Skincare',
+        content: `For mild eczema, maintaining a consistent moisturizing routine is key. Apply a fragrance-free, hypoallergenic moisturizer twice daily - once in the morning and once before bed.
 
 Key points:
-• Use thick, creamy moisturizers rather than lotions
-• Look for ingredients like ceramides, hyaluronic acid, and glycerin
-• Avoid products with fragrances, dyes, or alcohol
-• Apply moisturizer at least twice daily, more if needed
-• Consider using different products for face and body
+• Use lightweight, non-greasy moisturizers
+• Look for ingredients like ceramides and hyaluronic acid
+• Apply after showering while skin is still slightly damp
+• Keep a travel-sized moisturizer for on-the-go use
+• Choose products specifically labeled for sensitive skin
 
-Remember: The best moisturizer is one that works for your skin and that you'll use consistently.`,
-      tags: ['moisturizer', 'daily routine', 'barrier repair'],
-      readTime: '3 min'
-    },
-    {
-      id: '2',
-      title: 'Weather-Proofing Your Skin',
-      category: 'Weather',
-      content: `Weather changes can significantly impact eczema. Both extreme cold and heat can trigger flare-ups, so it's important to adapt your skincare routine seasonally.
-
-Winter care:
-• Use a humidifier to add moisture to dry indoor air
-• Switch to heavier, more occlusive moisturizers
-• Protect exposed skin when going outside
-• Take shorter, lukewarm showers
-
-Summer care:
-• Stay hydrated and avoid excessive heat
-• Use lightweight, non-comedogenic moisturizers
-• Seek shade during peak sun hours
-• Rinse off chlorine and salt water immediately after swimming`,
-      tags: ['weather', 'seasonal care', 'humidity'],
-      readTime: '4 min'
-    },
-    {
-      id: '3',
-      title: 'Stress Management for Skin Health',
-      category: 'Lifestyle',
-      content: `Stress is a common eczema trigger. Learning to manage stress effectively can help reduce flare-ups and improve overall skin health.
-
-Effective stress management techniques:
-• Practice deep breathing exercises daily
-• Try meditation or mindfulness apps
-• Maintain a regular sleep schedule (7-9 hours)
-• Exercise regularly, but shower immediately after
-• Consider yoga or tai chi for gentle movement
-• Keep a stress diary to identify triggers
-
-Professional help: Don't hesitate to speak with a counselor or therapist if stress feels overwhelming.`,
-      tags: ['stress', 'mental health', 'lifestyle'],
-      readTime: '5 min'
-    },
-    {
-      id: '4',
-      title: 'Creating an Eczema-Friendly Home',
-      category: 'Prevention',
-      content: `Your home environment plays a crucial role in managing eczema. Small changes can make a big difference in reducing triggers.
-
-Home modifications:
-• Use fragrance-free, hypoallergenic laundry detergents
-• Wash bedding in hot water (130°F) weekly
-• Choose cotton or bamboo fabrics over synthetic materials
-• Remove or minimize carpets and rugs
-• Keep humidity levels between 30-50%
-• Use HEPA air filters
-• Vacuum regularly with a HEPA filter vacuum
-
-Pet considerations: If you have pets, bathe them regularly and keep them out of bedrooms.`,
-      tags: ['home environment', 'allergens', 'prevention'],
-      readTime: '4 min'
-    },
-    {
-      id: '5',
-      title: 'Gentle Cleansing Practices',
-      category: 'Skincare',
-      content: `Proper cleansing is essential but can be tricky with eczema-prone skin. The goal is to remove dirt and bacteria without stripping natural oils.
+Remember: Consistency is more important than the specific product. Find what works and stick with it.`,
+        tags: ['moisturizer', 'daily routine', 'prevention'],
+        readTime: '3 min'
+      },
+      {
+        id: 'low-2',
+        title: 'Gentle Cleansing Practices',
+        category: 'Skincare',
+        content: `Proper cleansing helps maintain skin health without causing irritation. Use gentle, fragrance-free cleansers designed for sensitive skin.
 
 Best practices:
-• Use lukewarm (not hot) water
-• Limit showers/baths to 5-10 minutes
-• Choose gentle, fragrance-free cleansers
-• Pat skin dry instead of rubbing
+• Use lukewarm water (not hot)
+• Limit showers to 5-10 minutes
+• Choose soap-free or syndet cleansers
+• Pat skin dry gently with a soft towel
 • Apply moisturizer within 3 minutes of bathing
-• Consider soap-free cleansers or cleansing oils
+• Consider cleansing oils for dry skin
 
-Avoid: Harsh scrubs, loofahs, antibacterial soaps, and products with fragrances or essential oils.`,
-      tags: ['cleansing', 'bathing', 'gentle care'],
-      readTime: '3 min'
-    },
-    {
-      id: '6',
-      title: 'Dietary Considerations',
-      category: 'Diet',
-      content: `While food allergies don't cause eczema, certain foods may trigger flare-ups in some people. Working with a healthcare provider is important for identifying personal triggers.
+Avoid: Harsh scrubs, antibacterial soaps, and products with fragrances or essential oils.`,
+        tags: ['cleansing', 'bathing', 'gentle care'],
+        readTime: '3 min'
+      },
+      {
+        id: 'low-3',
+        title: 'Clothing and Fabric Choices',
+        category: 'Lifestyle',
+        content: `The clothes you wear can significantly impact your skin. Choose fabrics and styles that minimize irritation.
 
-Common trigger foods:
-• Dairy products
-• Eggs
-• Nuts and seeds
-• Soy products
-• Wheat/gluten
-• Certain fruits (citrus, tomatoes)
+Recommended:
+• Wear 100% cotton or bamboo fabrics
+• Avoid wool and synthetic materials directly on skin
+• Choose loose-fitting clothing
+• Wash new clothes before wearing
+• Use fragrance-free, hypoallergenic detergents
+• Avoid fabric softeners and dryer sheets
+• Remove tags that might scratch skin
 
-Anti-inflammatory foods to include:
-• Fatty fish (salmon, mackerel)
-• Leafy greens
-• Berries
-• Probiotics (yogurt, kefir)
-• Foods rich in omega-3 fatty acids
+Tip: Layer cotton clothing under wool or synthetic materials if you must wear them.`,
+        tags: ['clothing', 'fabric', 'comfort'],
+        readTime: '3 min'
+      },
+      {
+        id: 'low-4',
+        title: 'Hydration and Diet Basics',
+        category: 'Diet',
+        content: `While food doesn't cause eczema, maintaining good hydration and a balanced diet supports overall skin health.
 
-Important: Never eliminate major food groups without consulting a healthcare provider or registered dietitian.`,
-      tags: ['diet', 'nutrition', 'triggers'],
-      readTime: '4 min'
-    }
-  ];
+Hydration tips:
+• Drink plenty of water throughout the day
+• Limit caffeine and alcohol (they can dehydrate)
+• Eat water-rich foods like fruits and vegetables
+
+Diet considerations:
+• Include anti-inflammatory foods (berries, leafy greens, fatty fish)
+• Consider probiotics (yogurt, kefir)
+• Maintain a balanced diet with variety
+• Keep a food diary if you suspect food triggers
+
+Note: Only eliminate foods under medical supervision.`,
+        tags: ['diet', 'hydration', 'nutrition'],
+        readTime: '4 min'
+      },
+      {
+        id: 'low-5',
+        title: 'Stress Management Basics',
+        category: 'Lifestyle',
+        content: `Stress can trigger or worsen eczema symptoms. Simple stress management techniques can help prevent flare-ups.
+
+Easy techniques:
+• Practice deep breathing for 5 minutes daily
+• Take short breaks during stressful activities
+• Maintain a regular sleep schedule
+• Try gentle exercise like walking or yoga
+• Listen to calming music or nature sounds
+• Keep a simple stress journal
+
+Remember: Small, consistent practices are more effective than occasional intensive efforts.`,
+        tags: ['stress', 'mental health', 'wellness'],
+        readTime: '4 min'
+      },
+      {
+        id: 'low-6',
+        title: 'Environmental Protection',
+        category: 'Prevention',
+        content: `Simple changes to your environment can help prevent eczema flare-ups and maintain healthy skin.
+
+Home environment:
+• Use a humidifier in dry climates or winter months
+• Keep indoor temperature comfortable (not too hot)
+• Vacuum regularly to reduce dust
+• Wash bedding weekly in hot water
+• Choose fragrance-free household products
+• Keep pets out of bedrooms if you have allergies
+
+Outdoor protection:
+• Wear protective clothing in extreme weather
+• Use gentle sunscreen (mineral-based, fragrance-free)
+• Rinse off after swimming (chlorine/salt water)`,
+        tags: ['environment', 'prevention', 'home'],
+        readTime: '4 min'
+      }
+    ],
+    Moderate: [
+      {
+        id: 'mod-1',
+        title: 'Intensive Moisturizing Protocol',
+        category: 'Skincare',
+        content: `For moderate eczema, a more intensive moisturizing approach is needed. This includes multiple applications and potentially different products for different areas.
+
+Protocol:
+• Apply moisturizer 3-4 times daily
+• Use thicker, cream-based products (not lotions)
+• Apply immediately after bathing (within 3 minutes)
+• Consider using different products for face vs body
+• Use occlusive products at night (petroleum jelly, thick creams)
+• Keep moisturizer at room temperature for better absorption
+
+Product selection:
+• Look for ceramides, hyaluronic acid, glycerin, and dimethicone
+• Avoid products with fragrances, dyes, or alcohol
+• Consider prescription barrier repair creams if recommended by doctor`,
+        tags: ['moisturizer', 'intensive care', 'barrier repair'],
+        readTime: '4 min'
+      },
+      {
+        id: 'mod-2',
+        title: 'Wet Wrap Therapy',
+        category: 'Skincare',
+        content: `Wet wrap therapy can be highly effective for moderate eczema. This technique helps lock in moisture and provides a protective barrier.
+
+How to do wet wrap therapy:
+1. Take a lukewarm bath or shower (10-15 minutes)
+2. Pat skin dry gently, leaving it slightly damp
+3. Apply prescribed or recommended moisturizer/medication
+4. Soak cotton bandages or clothing in warm water
+5. Wring out excess water and apply over treated areas
+6. Cover with dry layer (pajamas or dry bandages)
+7. Leave on for 2-4 hours or overnight
+
+Frequency: 2-3 times per week during flare-ups, as recommended by your doctor.
+
+Important: Always consult with a healthcare provider before starting wet wrap therapy.`,
+        tags: ['wet wrap', 'therapy', 'moisture'],
+        readTime: '5 min'
+      },
+      {
+        id: 'mod-3',
+        title: 'Topical Treatment Management',
+        category: 'Skincare',
+        content: `For moderate eczema, topical treatments may be necessary. Proper application and management are crucial for effectiveness.
+
+Application tips:
+• Apply topical medications to affected areas only
+• Use the "fingertip unit" method for proper dosing
+• Apply before moisturizer (unless doctor says otherwise)
+• Wash hands after application
+• Follow doctor's instructions for frequency and duration
+• Don't stop treatment abruptly - taper as directed
+
+Common treatments:
+• Topical corticosteroids (as prescribed)
+• Topical calcineurin inhibitors
+• Barrier repair creams
+• Antihistamines for itching (if recommended)
+
+Safety: Always follow your doctor's instructions and report any side effects.`,
+        tags: ['treatment', 'medication', 'topical'],
+        readTime: '5 min'
+      },
+      {
+        id: 'mod-4',
+        title: 'Trigger Identification and Avoidance',
+        category: 'Prevention',
+        content: `Identifying and avoiding triggers becomes more important with moderate eczema. Keep detailed records to identify patterns.
+
+Tracking methods:
+• Maintain a daily symptom and trigger diary
+• Note weather conditions, activities, foods, and products used
+• Track itchiness levels and affected areas
+• Look for patterns over 2-4 weeks
+• Share findings with your healthcare provider
+
+Common triggers to monitor:
+• Environmental: Weather changes, pollen, dust, pet dander
+• Products: Soaps, detergents, cosmetics, fragrances
+• Stress: Work pressure, emotional events, lack of sleep
+• Foods: Keep detailed food diary (don't eliminate without medical guidance)
+• Clothing: Fabrics, tight clothing, tags
+
+Action: Once triggers are identified, develop avoidance strategies with your healthcare team.`,
+        tags: ['triggers', 'tracking', 'prevention'],
+        readTime: '5 min'
+      },
+      {
+        id: 'mod-5',
+        title: 'Bathing and Showering Guidelines',
+        category: 'Skincare',
+        content: `Proper bathing techniques are essential for moderate eczema management. The goal is to cleanse without further irritating the skin.
+
+Optimal bathing routine:
+• Bathe once daily (not more, unless very sweaty)
+• Use lukewarm water (not hot or cold)
+• Limit bath/shower time to 10-15 minutes
+• Add colloidal oatmeal or bath oil to bathwater
+• Use gentle, fragrance-free cleansers sparingly
+• Avoid scrubbing or using loofahs
+• Pat dry gently with soft towel
+• Apply moisturizer immediately (within 3 minutes)
+
+Bleach baths (if recommended by doctor):
+• Use 1/4 to 1/2 cup of regular bleach per full bathtub
+• Soak for 5-10 minutes, 2-3 times per week
+• Rinse with fresh water after
+• Always follow doctor's specific instructions
+
+Important: Never start bleach baths without medical supervision.`,
+        tags: ['bathing', 'cleansing', 'therapy'],
+        readTime: '5 min'
+      },
+      {
+        id: 'mod-6',
+        title: 'Sleep and Itch Management',
+        category: 'Lifestyle',
+        content: `Moderate eczema often disrupts sleep due to itching. Managing nighttime symptoms is crucial for overall health and recovery.
+
+Nighttime care:
+• Apply thicker moisturizers before bed
+• Keep bedroom cool and humidified
+• Use cotton bedding and loose cotton pajamas
+• Trim fingernails short to prevent scratching damage
+• Consider cotton gloves if you scratch in sleep
+• Take antihistamines before bed (if recommended by doctor)
+• Keep a cool, damp cloth by bedside for immediate relief
+
+Sleep hygiene:
+• Maintain consistent sleep schedule
+• Create relaxing bedtime routine
+• Avoid screens 1 hour before bed
+• Keep bedroom dark and quiet
+• Consider meditation or gentle stretching before sleep
+
+If itching severely disrupts sleep, consult your healthcare provider about additional management options.`,
+        tags: ['sleep', 'itching', 'nighttime'],
+        readTime: '5 min'
+      }
+    ],
+    High: [
+      {
+        id: 'high-1',
+        title: 'Medical Treatment Coordination',
+        category: 'Skincare',
+        content: `Severe eczema requires close coordination with healthcare providers. Multiple treatment approaches may be needed simultaneously.
+
+Treatment options (prescribed by doctor):
+• Topical corticosteroids (potent formulations)
+• Topical calcineurin inhibitors
+• Systemic medications (oral or injectable)
+• Phototherapy (light therapy)
+• Biologic medications
+• Combination therapies
+
+Management strategies:
+• Follow treatment plan exactly as prescribed
+• Keep all medical appointments
+• Report side effects immediately
+• Don't stop medications without doctor approval
+• Use medications as directed (not more, not less)
+• Keep detailed symptom and treatment logs
+• Work with dermatologist and primary care provider
+
+Critical: Severe eczema requires professional medical management. Self-treatment can be dangerous.`,
+        tags: ['medical', 'treatment', 'severe'],
+        readTime: '6 min'
+      },
+      {
+        id: 'high-2',
+        title: 'Infection Prevention and Recognition',
+        category: 'Prevention',
+        content: `Severe eczema increases infection risk. Recognizing and preventing infections is crucial for safety and recovery.
+
+Signs of infection (seek immediate medical care):
+• Increased redness, warmth, or swelling
+• Yellow or green discharge/crusting
+• Fever or chills
+• Increased pain (beyond usual itching)
+• Red streaks spreading from affected area
+• Swollen lymph nodes
+
+Prevention strategies:
+• Keep affected areas clean and moisturized
+• Avoid scratching (use prescribed anti-itch medications)
+• Trim nails very short and keep clean
+• Wash hands frequently
+• Use prescribed topical antibiotics if recommended
+• Cover open wounds with clean dressings
+• Avoid sharing towels, clothing, or personal items
+
+Action plan: Have an emergency contact plan with your healthcare provider for suspected infections.`,
+        tags: ['infection', 'safety', 'prevention'],
+        readTime: '6 min'
+      },
+      {
+        id: 'high-3',
+        title: 'Intensive Moisture Barrier Repair',
+        category: 'Skincare',
+        content: `Severe eczema requires aggressive barrier repair. The skin barrier is significantly compromised and needs intensive support.
+
+Barrier repair protocol:
+• Apply thick, occlusive moisturizers 4-6 times daily
+• Use prescription barrier repair creams as directed
+• Apply immediately after every hand washing
+• Use petroleum jelly or similar occlusives at night
+• Consider wet wrap therapy (under medical supervision)
+• Avoid all potential irritants (fragrances, harsh soaps)
+• Use only doctor-approved products
+
+Product selection:
+• Prescription barrier repair creams (ceramide-based)
+• Thick, fragrance-free creams (not lotions)
+• Occlusive ointments for very dry areas
+• Gentle, soap-free cleansers only
+
+Timing: Apply moisturizer within 3 minutes of any water contact (bathing, hand washing, etc.).`,
+        tags: ['barrier repair', 'moisturizing', 'intensive'],
+        readTime: '5 min'
+      },
+      {
+        id: 'high-4',
+        title: 'Systemic Treatment Management',
+        category: 'Skincare',
+        content: `Severe eczema may require systemic treatments (oral or injectable medications). These require careful monitoring and management.
+
+Types of systemic treatments:
+• Oral corticosteroids (short-term use)
+• Immunosuppressants (cyclosporine, methotrexate, etc.)
+• Biologic medications (dupilumab, etc.)
+• JAK inhibitors (as approved and prescribed)
+
+Important considerations:
+• Regular blood tests and monitoring required
+• Report all side effects immediately
+• Don't stop medications without doctor approval
+• Inform all healthcare providers of medications
+• Keep detailed medication and symptom logs
+• Follow up appointments are critical
+• Understand potential side effects and warning signs
+
+Safety: These medications require close medical supervision. Never adjust dosages independently.`,
+        tags: ['systemic', 'medication', 'severe'],
+        readTime: '6 min'
+      },
+      {
+        id: 'high-5',
+        title: 'Emergency Flare Management',
+        category: 'Prevention',
+        content: `Severe eczema can have sudden, severe flare-ups. Having an emergency action plan is essential.
+
+Emergency action plan:
+1. Contact healthcare provider immediately
+2. Follow prescribed "rescue" medication protocol
+3. Apply cool compresses (not ice directly)
+4. Use prescribed anti-itch medications
+5. Avoid all triggers and irritants
+6. Increase moisturizing frequency
+7. Consider wet wrap therapy if previously prescribed
+8. Monitor for signs of infection
+
+When to seek emergency care:
+• Signs of infection (fever, spreading redness, discharge)
+• Severe pain beyond usual itching
+• Difficulty sleeping or functioning
+• Widespread flare affecting large body areas
+• Symptoms not responding to prescribed treatments
+
+Preparation: Keep emergency contact numbers, medications, and supplies readily available.`,
+        tags: ['emergency', 'flare-up', 'management'],
+        readTime: '5 min'
+      },
+      {
+        id: 'high-6',
+        title: 'Comprehensive Lifestyle Modifications',
+        category: 'Lifestyle',
+        content: `Severe eczema requires comprehensive lifestyle modifications to support medical treatment and prevent triggers.
+
+Environmental modifications:
+• Remove all potential allergens and irritants from home
+• Use HEPA air filters throughout living spaces
+• Maintain consistent temperature and humidity
+• Remove carpets and minimize dust-collecting items
+• Use only fragrance-free, hypoallergenic products
+• Wash all clothing and bedding in hypoallergenic detergents
+• Consider professional cleaning for allergen reduction
+
+Daily routine adjustments:
+• Minimize stress through counseling, meditation, or therapy
+• Maintain strict sleep schedule (7-9 hours)
+• Avoid known triggers completely
+• Plan activities around treatment schedule
+• Keep treatment supplies accessible at all times
+• Modify work/school environment if needed
+• Consider support groups for emotional support
+
+Diet and nutrition:
+• Work with dietitian if food triggers suspected
+• Maintain balanced nutrition despite restrictions
+• Stay well-hydrated
+• Consider anti-inflammatory diet (under medical guidance)
+
+Remember: These modifications work best when combined with proper medical treatment.`,
+        tags: ['lifestyle', 'modifications', 'comprehensive'],
+        readTime: '6 min'
+      }
+    ]
+  };
+
+  // Get tips based on selected severity
+  const tips: Tip[] = tipsBySeverity[selectedSeverity];
 
   const filteredTips = tips.filter(tip => {
     const matchesSearch = tip.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -184,6 +499,49 @@ Important: Never eliminate major food groups without consulting a healthcare pro
         <p className="text-gray-300 text-lg">
           Expert-backed tips to help you manage eczema effectively
         </p>
+      </div>
+
+      {/* Severity Level Selector */}
+      <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-white mb-2">Select Your Eczema Severity Level</h2>
+          <p className="text-gray-300 text-sm">Choose the level that best matches your current condition to see relevant advice</p>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={() => setSelectedSeverity('Low')}
+            className={`flex-1 min-w-[120px] px-6 py-4 rounded-lg font-semibold transition-all ${
+              selectedSeverity === 'Low'
+                ? 'bg-green-500 text-white shadow-lg scale-105'
+                : 'bg-white bg-opacity-10 text-gray-300 hover:bg-opacity-20'
+            }`}
+          >
+            Low
+            <p className="text-xs mt-1 opacity-90">Mild symptoms</p>
+          </button>
+          <button
+            onClick={() => setSelectedSeverity('Moderate')}
+            className={`flex-1 min-w-[120px] px-6 py-4 rounded-lg font-semibold transition-all ${
+              selectedSeverity === 'Moderate'
+                ? 'bg-yellow-500 text-white shadow-lg scale-105'
+                : 'bg-white bg-opacity-10 text-gray-300 hover:bg-opacity-20'
+            }`}
+          >
+            Moderate
+            <p className="text-xs mt-1 opacity-90">Moderate symptoms</p>
+          </button>
+          <button
+            onClick={() => setSelectedSeverity('High')}
+            className={`flex-1 min-w-[120px] px-6 py-4 rounded-lg font-semibold transition-all ${
+              selectedSeverity === 'High'
+                ? 'bg-red-500 text-white shadow-lg scale-105'
+                : 'bg-white bg-opacity-10 text-gray-300 hover:bg-opacity-20'
+            }`}
+          >
+            High
+            <p className="text-xs mt-1 opacity-90">Severe symptoms</p>
+          </button>
+        </div>
       </div>
 
       {/* Search and Filter */}

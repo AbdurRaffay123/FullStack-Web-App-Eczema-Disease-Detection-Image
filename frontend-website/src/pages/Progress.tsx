@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -20,41 +20,216 @@ import {
   Award, 
   Target,
   CheckCircle,
-  AlertCircle,
-  Clock,
-  Lightbulb
+  Lightbulb,
+  Bell
 } from 'lucide-react';
+import { symptomService, SymptomLog } from '../services/symptomService';
+import { reminderService, Reminder } from '../services/reminderService';
+import { useToast } from '../context/ToastContext';
 
 const Progress: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('30');
+  const [logs, setLogs] = useState<SymptomLog[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingReminders, setIsLoadingReminders] = useState(true);
+  const { showToast } = useToast();
 
-  // Mock data for charts
-  const itchinessData = [
-    { date: '2024-01-01', level: 7 },
-    { date: '2024-01-03', level: 6 },
-    { date: '2024-01-05', level: 5 },
-    { date: '2024-01-07', level: 4 },
-    { date: '2024-01-09', level: 6 },
-    { date: '2024-01-11', level: 3 },
-    { date: '2024-01-13', level: 2 },
-    { date: '2024-01-15', level: 4 },
-  ];
+  // Load logs and reminders on mount
+  useEffect(() => {
+    loadLogs();
+    loadReminders();
+  }, []);
 
-  const flareUpData = [
-    { month: 'Sep', count: 8 },
-    { month: 'Oct', count: 6 },
-    { month: 'Nov', count: 4 },
-    { month: 'Dec', count: 3 },
-    { month: 'Jan', count: 2 },
-  ];
+  const loadLogs = async () => {
+    try {
+      setIsLoading(true);
+      const fetchedLogs = await symptomService.getLogs();
+      setLogs(fetchedLogs);
+    } catch (error: any) {
+      showToast(error.message || 'Failed to load logs', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const triggerData = [
-    { name: 'Stress', value: 35, color: '#EF4444' },
-    { name: 'Weather', value: 25, color: '#F59E0B' },
-    { name: 'Diet', value: 20, color: '#10B981' },
-    { name: 'Products', value: 15, color: '#6366F1' },
-    { name: 'Other', value: 5, color: '#8B5CF6' },
-  ];
+  const loadReminders = async () => {
+    try {
+      setIsLoadingReminders(true);
+      const fetchedReminders = await reminderService.getReminders();
+      setReminders(fetchedReminders);
+    } catch (error: any) {
+      console.error('Failed to load reminders:', error);
+      // Don't show toast for reminders as it's not critical
+    } finally {
+      setIsLoadingReminders(false);
+    }
+  };
+
+  // Filter logs based on selected period
+  const filteredLogs = useMemo(() => {
+    const days = parseInt(selectedPeriod, 10);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    return logs.filter(log => {
+      const logDate = new Date(log.createdAt);
+      return logDate >= cutoffDate;
+    }).sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  }, [logs, selectedPeriod]);
+
+  // Calculate average itchiness
+  const averageItchiness = useMemo(() => {
+    if (filteredLogs.length === 0) return 0;
+    const sum = filteredLogs.reduce((acc, log) => acc + log.itchinessLevel, 0);
+    return (sum / filteredLogs.length).toFixed(1);
+  }, [filteredLogs]);
+
+  // Format data for itchiness trend chart
+  const itchinessData = useMemo(() => {
+    return filteredLogs.map(log => ({
+      date: new Date(log.createdAt).toISOString().split('T')[0],
+      level: log.itchinessLevel,
+    }));
+  }, [filteredLogs]);
+
+  // Calculate percentage change (comparing first half vs second half of period)
+  const itchinessChange = useMemo(() => {
+    if (filteredLogs.length < 2) return null;
+    
+    const midPoint = Math.floor(filteredLogs.length / 2);
+    const firstHalf = filteredLogs.slice(0, midPoint);
+    const secondHalf = filteredLogs.slice(midPoint);
+    
+    const firstAvg = firstHalf.reduce((acc, log) => acc + log.itchinessLevel, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((acc, log) => acc + log.itchinessLevel, 0) / secondHalf.length;
+    
+    if (firstAvg === 0) return null;
+    
+    const change = ((secondAvg - firstAvg) / firstAvg) * 100;
+    return change.toFixed(0);
+  }, [filteredLogs]);
+
+  // Calculate monthly flare-ups from logs
+  // A flare-up is defined as a day with itchiness level >= 7 (severe)
+  const flareUpData = useMemo(() => {
+    // Get logs from last 5 months
+    const fiveMonthsAgo = new Date();
+    fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 5);
+    
+    const recentLogs = logs.filter(log => {
+      const logDate = new Date(log.createdAt);
+      return logDate >= fiveMonthsAgo && log.itchinessLevel >= 7; // Flare-up threshold
+    });
+
+    // Group by month
+    const monthlyCounts = new Map<string, number>();
+    
+    recentLogs.forEach(log => {
+      const logDate = new Date(log.createdAt);
+      const monthKey = logDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+    });
+
+    // Convert to array format and sort by date
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const result = Array.from(monthlyCounts.entries())
+      .map(([monthYear, count]) => {
+        const [month, year] = monthYear.split(' ');
+        return {
+          month,
+          monthYear,
+          count,
+          sortKey: parseInt(year) * 12 + monthNames.indexOf(month)
+        };
+      })
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .slice(-5) // Last 5 months
+      .map(({ month, count }) => ({ month, count }));
+
+    return result.length > 0 ? result : [
+      { month: new Date().toLocaleDateString('en-US', { month: 'short' }), count: 0 }
+    ];
+  }, [logs]);
+
+  // Calculate flare-ups this month
+  const flareUpsThisMonth = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    return logs.filter(log => {
+      const logDate = new Date(log.createdAt);
+      return logDate >= startOfMonth && log.itchinessLevel >= 7;
+    }).length;
+  }, [logs]);
+
+  // Analyze triggers from logs
+  // Parse possibleTriggers field from logs and count occurrences
+  const triggerData = useMemo(() => {
+    // Common trigger keywords to categorize
+    const triggerCategories: { [key: string]: { keywords: string[]; color: string } } = {
+      'Stress': { keywords: ['stress', 'anxiety', 'worried', 'tension'], color: '#EF4444' },
+      'Weather': { keywords: ['weather', 'dry', 'humid', 'cold', 'hot', 'temperature', 'climate'], color: '#F59E0B' },
+      'Diet': { keywords: ['food', 'diet', 'eating', 'meal', 'dairy', 'gluten', 'nuts', 'spicy'], color: '#10B981' },
+      'Products': { keywords: ['soap', 'detergent', 'shampoo', 'lotion', 'cream', 'fabric', 'softener', 'product'], color: '#6366F1' },
+      'Allergens': { keywords: ['pollen', 'dust', 'dander', 'pet', 'allergen', 'mold'], color: '#8B5CF6' },
+      'Other': { keywords: [], color: '#94A3B8' },
+    };
+
+    // Count trigger occurrences
+    const triggerCounts = new Map<string, number>();
+    let totalTriggers = 0;
+
+    filteredLogs.forEach(log => {
+      if (log.possibleTriggers && log.possibleTriggers.trim()) {
+        // Split by comma, semicolon, or newline
+        const triggers = log.possibleTriggers
+          .split(/[,;\n]/)
+          .map(t => t.trim().toLowerCase())
+          .filter(t => t.length > 0);
+
+        triggers.forEach(trigger => {
+          // Try to match with categories
+          let categorized = false;
+          for (const [category, { keywords }] of Object.entries(triggerCategories)) {
+            if (category === 'Other') continue;
+            
+            if (keywords.some(keyword => trigger.includes(keyword) || keyword.includes(trigger))) {
+              triggerCounts.set(category, (triggerCounts.get(category) || 0) + 1);
+              totalTriggers++;
+              categorized = true;
+              break;
+            }
+          }
+
+          // If not categorized, add to "Other"
+          if (!categorized) {
+            triggerCounts.set('Other', (triggerCounts.get('Other') || 0) + 1);
+            totalTriggers++;
+          }
+        });
+      }
+    });
+
+    // Convert to array with percentages
+    if (totalTriggers === 0) {
+      return [];
+    }
+
+    const result = Array.from(triggerCounts.entries())
+      .map(([name, count]) => ({
+        name,
+        value: Math.round((count / totalTriggers) * 100),
+        count,
+        color: triggerCategories[name]?.color || triggerCategories['Other'].color,
+      }))
+      .sort((a, b) => b.value - a.value) // Sort by percentage descending
+      .slice(0, 6); // Top 6 triggers
+
+    return result;
+  }, [filteredLogs]);
 
   const achievements = [
     {
@@ -95,52 +270,57 @@ const Progress: React.FC = () => {
     }
   ];
 
-  const insights = [
-    {
-      type: 'positive',
-      title: 'Great Progress!',
-      description: 'Your average itchiness level has decreased by 23% this month.',
-      icon: TrendingUp
-    },
-    {
-      type: 'warning',
-      title: 'Pattern Detected',
-      description: 'Stress seems to be your main trigger. Consider stress management techniques.',
-      icon: AlertCircle
-    },
-    {
-      type: 'info',
-      title: 'Routine Reminder',
-      description: 'You\'ve missed logging symptoms for 2 days. Consistency helps track progress.',
-      icon: Clock
-    }
-  ];
+  // Reminder tracking data
+  const reminderChartData = useMemo(() => {
+    // Group reminders by creation month
+    const monthlyCounts = new Map<string, number>();
+    const monthlyActive = new Map<string, number>();
+    
+    reminders.forEach(reminder => {
+      if (reminder.createdAt) {
+        const date = new Date(reminder.createdAt);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+        if (reminder.isActive) {
+          monthlyActive.set(monthKey, (monthlyActive.get(monthKey) || 0) + 1);
+        }
+      }
+    });
 
-  const getInsightColor = (type: string) => {
-    switch (type) {
-      case 'positive':
-        return 'bg-green-500 bg-opacity-10 border-green-500 border-opacity-20 text-green-300';
-      case 'warning':
-        return 'bg-yellow-500 bg-opacity-10 border-yellow-500 border-opacity-20 text-yellow-300';
-      case 'info':
-        return 'bg-blue-500 bg-opacity-10 border-blue-500 border-opacity-20 text-blue-300';
-      default:
-        return 'bg-gray-500 bg-opacity-10 border-gray-500 border-opacity-20 text-gray-300';
+    // Get last 6 months
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const result = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const monthName = monthNames[date.getMonth()];
+      
+      result.push({
+        month: monthName,
+        monthKey,
+        total: monthlyCounts.get(monthKey) || 0,
+        active: monthlyActive.get(monthKey) || 0,
+        inactive: (monthlyCounts.get(monthKey) || 0) - (monthlyActive.get(monthKey) || 0)
+      });
     }
-  };
+    
+    return result;
+  }, [reminders]);
 
-  const getInsightIconColor = (type: string) => {
-    switch (type) {
-      case 'positive':
-        return 'text-green-400';
-      case 'warning':
-        return 'text-yellow-400';
-      case 'info':
-        return 'text-blue-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
+  // Reminder statistics
+  const reminderStats = useMemo(() => {
+    const total = reminders.length;
+    const active = reminders.filter(r => r.isActive).length;
+    const byType = {
+      medication: reminders.filter(r => r.type === 'medication').length,
+      appointment: reminders.filter(r => r.type === 'appointment').length,
+      custom: reminders.filter(r => r.type === 'custom').length,
+    };
+    
+    return { total, active, inactive: total - active, byType };
+  }, [reminders]);
 
   return (
     <div className="space-y-8">
@@ -169,10 +349,21 @@ const Progress: React.FC = () => {
             <div className="bg-green-500 bg-opacity-20 p-3 rounded-lg">
               <TrendingUp className="h-6 w-6 text-green-400" />
             </div>
-            <span className="text-green-400 text-sm font-medium">↓ 23%</span>
+            {itchinessChange !== null && (
+              <span className={`text-sm font-medium ${
+                parseFloat(itchinessChange) < 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {parseFloat(itchinessChange) < 0 ? '↓' : '↑'} {Math.abs(parseFloat(itchinessChange))}%
+              </span>
+            )}
           </div>
-          <h3 className="text-2xl font-bold text-white mb-1">3.2</h3>
+          <h3 className="text-2xl font-bold text-white mb-1">
+            {isLoading ? '...' : averageItchiness || '0.0'}
+          </h3>
           <p className="text-gray-300 text-sm">Average Itchiness</p>
+          {filteredLogs.length === 0 && !isLoading && (
+            <p className="text-xs text-gray-400 mt-1">No data for selected period</p>
+          )}
         </div>
 
         <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
@@ -191,10 +382,15 @@ const Progress: React.FC = () => {
             <div className="bg-purple-500 bg-opacity-20 p-3 rounded-lg">
               <Target className="h-6 w-6 text-purple-400" />
             </div>
-            <span className="text-red-400 text-sm font-medium">↑ 2</span>
+            {flareUpsThisMonth > 0 && (
+              <span className="text-red-400 text-sm font-medium">↑ {flareUpsThisMonth}</span>
+            )}
           </div>
-          <h3 className="text-2xl font-bold text-white mb-1">2</h3>
+          <h3 className="text-2xl font-bold text-white mb-1">
+            {isLoading ? '...' : flareUpsThisMonth}
+          </h3>
           <p className="text-gray-300 text-sm">Flare-ups This Month</p>
+          <p className="text-xs text-gray-400 mt-1">(Itchiness ≥ 7)</p>
         </div>
 
         <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
@@ -214,114 +410,178 @@ const Progress: React.FC = () => {
         {/* Itchiness Trend */}
         <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white mb-6">Itchiness Level Trend</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={itchinessData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                  tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                />
-                <YAxis 
-                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                  domain={[0, 10]}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(0,0,0,0.8)', 
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="level" 
-                  stroke="#6A9FB5" 
-                  strokeWidth={3}
-                  dot={{ fill: '#6A9FB5', strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {isLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A9FB5]"></div>
+            </div>
+          ) : itchinessData.length === 0 ? (
+            <div className="h-64 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-gray-400 mb-2">No data available</p>
+                <p className="text-gray-500 text-sm">Start logging your symptoms to see trends</p>
+              </div>
+            </div>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={itchinessData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                    domain={[0, 10]}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(0,0,0,0.8)', 
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                    labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="level" 
+                    stroke="#6A9FB5" 
+                    strokeWidth={3}
+                    dot={{ fill: '#6A9FB5', strokeWidth: 2, r: 4 }}
+                    name="Itchiness Level"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Flare-up Frequency */}
         <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white mb-6">Monthly Flare-ups</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={flareUpData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="month" 
-                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                />
-                <YAxis 
-                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(0,0,0,0.8)', 
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-                <Bar dataKey="count" fill="#C5B4E3" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <p className="text-gray-400 text-sm mb-4">Days with itchiness level ≥ 7 (severe symptoms)</p>
+          {isLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A9FB5]"></div>
+            </div>
+          ) : flareUpData.length === 0 || flareUpData.every(d => d.count === 0) ? (
+            <div className="h-64 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-gray-400 mb-2">No flare-ups recorded</p>
+                <p className="text-gray-500 text-sm">Great job managing your symptoms!</p>
+              </div>
+            </div>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={flareUpData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(0,0,0,0.8)', 
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                    formatter={(value: number) => [`${value} day${value !== 1 ? 's' : ''}`, 'Flare-ups']}
+                  />
+                  <Bar dataKey="count" fill="#C5B4E3" radius={[4, 4, 0, 0]} name="Flare-ups" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Trigger Analysis */}
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-white mb-6">Trigger Analysis</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={triggerData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {triggerData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(0,0,0,0.8)', 
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+        <h2 className="text-xl font-bold text-white mb-2">Trigger Analysis</h2>
+        <p className="text-gray-400 text-sm mb-6">Based on triggers logged in your symptom entries</p>
+        {isLoading ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A9FB5]"></div>
           </div>
-          <div className="space-y-4">
-            {triggerData.map((trigger, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: trigger.color }}
-                  ></div>
-                  <span className="text-white font-medium">{trigger.name}</span>
+        ) : triggerData.length === 0 ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-gray-400 mb-2">No trigger data available</p>
+              <p className="text-gray-500 text-sm">Start logging triggers in your symptom entries to see analysis</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={triggerData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}%`}
+                    labelLine={false}
+                  >
+                    {triggerData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(0,0,0,0.8)', 
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                    formatter={(value: number, name: string, props: any) => [
+                      `${value}% (${props.payload.count} occurrence${props.payload.count !== 1 ? 's' : ''})`,
+                      props.payload.name
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white mb-4">Top Triggers</h3>
+              {triggerData.map((trigger, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div 
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: trigger.color }}
+                    ></div>
+                    <span className="text-white font-medium">{trigger.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-300 text-sm">({trigger.count}x)</span>
+                    <span className="text-gray-300 font-semibold">{trigger.value}%</span>
+                  </div>
                 </div>
-                <span className="text-gray-300">{trigger.value}%</span>
-              </div>
-            ))}
+              ))}
+              {filteredLogs.length > 0 && triggerData.length === 0 && (
+                <p className="text-gray-400 text-sm italic">
+                  No triggers logged yet. Add triggers when logging symptoms to see analysis.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Achievements */}
@@ -375,25 +635,94 @@ const Progress: React.FC = () => {
         </div>
       </div>
 
-      {/* Insights */}
+      {/* Reminder Tracking */}
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-white mb-6">Personalized Insights</h2>
-        <div className="space-y-4">
-          {insights.map((insight, index) => (
-            <div
-              key={index}
-              className={`p-4 rounded-lg border ${getInsightColor(insight.type)}`}
-            >
-              <div className="flex items-start space-x-3">
-                <insight.icon className={`h-5 w-5 mt-0.5 ${getInsightIconColor(insight.type)}`} />
-                <div>
-                  <h3 className="font-semibold mb-1">{insight.title}</h3>
-                  <p className="text-sm opacity-90">{insight.description}</p>
-                </div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-white mb-2">Reminder Tracking</h2>
+            <p className="text-gray-400 text-sm">Track your reminders over time</p>
+          </div>
+          <div className="bg-[#6A9FB5] bg-opacity-20 p-3 rounded-lg">
+            <Bell className="h-6 w-6 text-[#6A9FB5]" />
+          </div>
+        </div>
+
+        {/* Reminder Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white bg-opacity-5 rounded-lg p-4 border border-white border-opacity-10">
+            <p className="text-gray-400 text-sm mb-1">Total Reminders</p>
+            <p className="text-2xl font-bold text-white">{isLoadingReminders ? '...' : reminderStats.total}</p>
+          </div>
+          <div className="bg-white bg-opacity-5 rounded-lg p-4 border border-white border-opacity-10">
+            <p className="text-gray-400 text-sm mb-1">Active</p>
+            <p className="text-2xl font-bold text-green-400">{isLoadingReminders ? '...' : reminderStats.active}</p>
+          </div>
+          <div className="bg-white bg-opacity-5 rounded-lg p-4 border border-white border-opacity-10">
+            <p className="text-gray-400 text-sm mb-1">Inactive</p>
+            <p className="text-2xl font-bold text-gray-400">{isLoadingReminders ? '...' : reminderStats.inactive}</p>
+          </div>
+          <div className="bg-white bg-opacity-5 rounded-lg p-4 border border-white border-opacity-10">
+            <p className="text-gray-400 text-sm mb-1">By Type</p>
+            <p className="text-sm text-white">
+              Med: {reminderStats.byType.medication} | Appt: {reminderStats.byType.appointment} | Custom: {reminderStats.byType.custom}
+            </p>
+          </div>
+        </div>
+
+        {/* Reminder Chart */}
+        {isLoadingReminders ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A9FB5]"></div>
+          </div>
+        ) : reminderChartData.length === 0 || reminderChartData.every(d => d.total === 0) ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <Bell className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-400 mb-2">No reminders created yet</p>
+              <p className="text-gray-500 text-sm">Create reminders to track them here</p>
+            </div>
+          </div>
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={reminderChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                />
+                <YAxis 
+                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(0,0,0,0.8)', 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                  formatter={(value: number, name: string) => [
+                    `${value} reminder${value !== 1 ? 's' : ''}`,
+                    name === 'active' ? 'Active' : name === 'inactive' ? 'Inactive' : 'Total'
+                  ]}
+                />
+                <Bar dataKey="active" stackId="a" fill="#10B981" name="active" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="inactive" stackId="a" fill="#6B7280" name="inactive" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex justify-center gap-6 mt-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-green-500"></div>
+                <span className="text-sm text-gray-300">Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-gray-500"></div>
+                <span className="text-sm text-gray-300">Inactive</span>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
