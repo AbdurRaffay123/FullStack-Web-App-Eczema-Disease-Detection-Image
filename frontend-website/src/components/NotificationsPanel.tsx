@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { reminderService, Notification } from '../services/reminderService';
-import { useToast } from '../context/ToastContext';
+import React, { useEffect } from 'react';
+import { useNotifications } from '../context/NotificationContext';
 import { Bell, X, Check, CheckCheck, Clock } from 'lucide-react';
 
 interface NotificationsPanelProps {
@@ -9,50 +8,30 @@ interface NotificationsPanelProps {
 }
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const { showToast } = useToast();
+  const { notifications, isLoading, unreadCount, markAsRead, markAllAsRead, refreshNotifications } = useNotifications();
 
+  // Refresh notifications when panel opens
   useEffect(() => {
     if (isOpen) {
-      loadNotifications();
+      refreshNotifications();
     }
-  }, [isOpen]);
-
-  const loadNotifications = async () => {
-    try {
-      setIsLoading(true);
-      const result = await reminderService.getNotifications({ limit: 50 });
-      setNotifications(result.notifications);
-    } catch (error: any) {
-      console.error('Failed to load notifications:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [isOpen, refreshNotifications]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await reminderService.markAsRead(id);
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, isRead: true } : n)
-      );
-    } catch (error: any) {
-      showToast(error.message || 'Failed to mark notification as read', 'error');
+      await markAsRead(id);
+    } catch (error) {
+      // Error already handled in context
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
-      await reminderService.markAllAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      showToast('All notifications marked as read', 'success');
-    } catch (error: any) {
-      showToast(error.message || 'Failed to mark all as read', 'error');
+      await markAllAsRead();
+    } catch (error) {
+      // Error already handled in context
     }
   };
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   if (!isOpen) return null;
 

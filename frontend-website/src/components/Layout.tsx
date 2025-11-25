@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useNotificationPolling } from '../hooks/useNotificationPolling';
+import { useNotifications } from '../context/NotificationContext';
 import NotificationsPanel from './NotificationsPanel';
 import { 
   Home, 
@@ -25,10 +25,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const [showNotifications, setShowNotifications] = useState(false);
   
-  // Start notification polling when user is logged in
-  const { notifications } = useNotificationPolling(!!user);
-  
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Get notifications and unread count from global context
+  const { unreadCount } = useNotifications();
 
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Dashboard' },

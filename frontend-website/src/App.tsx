@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
@@ -20,6 +21,7 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
+        <NotificationProvider>
         <Router>
           <div className="min-h-screen bg-gradient-to-br from-[#1A1A2E] via-[#16213E] to-[#0F3460]">
             <Routes>
@@ -49,6 +51,7 @@ function App() {
             <Toast />
           </div>
         </Router>
+        </NotificationProvider>
       </ToastProvider>
     </AuthProvider>
   );
