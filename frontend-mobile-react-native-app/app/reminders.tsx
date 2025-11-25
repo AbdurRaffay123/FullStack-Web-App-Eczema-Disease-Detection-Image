@@ -1,6 +1,6 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Switch, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Switch, Alert, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Plus, Bell, Clock, Trash2, CreditCard as Edit3, Pill, Droplets, Sun } from 'lucide-react-native';
+import { ArrowLeft, Plus, Bell, Clock, Trash2, CreditCard as Edit3, Pill, Droplets, Sun, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
@@ -17,7 +17,11 @@ export default function RemindersScreen() {
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderTime, setReminderTime] = useState('09:00');
   const [reminderType, setReminderType] = useState<'medication' | 'appointment' | 'custom'>('medication');
+  const [reminderMode, setReminderMode] = useState<'recurring' | 'one-time'>('recurring');
   const [reminderDays, setReminderDays] = useState<string[]>(['daily']);
+  const [reminderDate, setReminderDate] = useState<string>(
+    new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+  );
   const [reminderNote, setReminderNote] = useState('');
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,7 +113,11 @@ export default function RemindersScreen() {
     setReminderTitle(reminder.title);
     setReminderTime(reminder.time.includes('T') ? reminder.time.split('T')[1].substring(0, 5) : reminder.time.substring(0, 5));
     setReminderType(reminder.type);
-    setReminderDays(reminder.days);
+    setReminderMode(reminder.reminderMode || 'recurring');
+    setReminderDays(reminder.days || ['daily']);
+    if (reminder.date) {
+      setReminderDate(reminder.date.split('T')[0]); // Extract YYYY-MM-DD from ISO string
+    }
     setReminderNote(reminder.customMessage || '');
     setEditingReminder(reminder);
     setShowAddForm(true);
@@ -121,20 +129,31 @@ export default function RemindersScreen() {
       return;
     }
 
-    if (reminderDays.length === 0) {
-      Alert.alert('Error', 'Please select at least one day');
+    if (reminderMode === 'recurring' && reminderDays.length === 0) {
+      Alert.alert('Error', 'Please select at least one day for recurring reminders');
+      return;
+    }
+
+    if (reminderMode === 'one-time' && !reminderDate) {
+      Alert.alert('Error', 'Please select a date for one-time reminders');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const reminderData = {
+      const reminderData: any = {
         title: reminderTitle.trim(),
         type: reminderType,
         time: reminderTime,
-        days: reminderDays,
+        reminderMode: reminderMode,
         customMessage: reminderNote.trim() || undefined,
       };
+
+      if (reminderMode === 'recurring') {
+        reminderData.days = reminderDays;
+      } else {
+        reminderData.date = reminderDate; // Already in YYYY-MM-DD format
+      }
 
       let result;
       if (editingReminder) {
@@ -180,13 +199,16 @@ export default function RemindersScreen() {
     setReminderTitle('');
     setReminderTime('09:00');
     setReminderType('medication');
+    setReminderMode('recurring');
     setReminderDays(['daily']);
+    setReminderDate(new Date().toISOString().split('T')[0]);
     setReminderNote('');
     setEditingReminder(null);
     setShowAddForm(false);
   };
 
-  const formatDays = (days: string[]) => {
+  const formatDays = (days?: string[]) => {
+    if (!days || days.length === 0) return 'N/A';
     if (days.includes('daily')) return 'Daily';
     if (days.length === 7) return 'Daily';
     const dayMap: { [key: string]: string } = {
@@ -196,6 +218,12 @@ export default function RemindersScreen() {
     if (days.length === 5 && !days.includes('sat') && !days.includes('sun')) return 'Weekdays';
     if (days.length === 2 && days.includes('sat') && days.includes('sun')) return 'Weekends';
     return days.map(d => dayMap[d.toLowerCase()] || d).join(', ');
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const formatTime = (time: string) => {
@@ -266,7 +294,7 @@ export default function RemindersScreen() {
                         styles.typeChip,
                         reminderType === type.id && { backgroundColor: type.color }
                       ]}
-                      onPress={() => setReminderType(type.id)}
+                      onPress={() => setReminderType(type.id as 'medication' | 'appointment' | 'custom')}
                     >
                       <type.icon 
                         size={16} 
@@ -284,6 +312,45 @@ export default function RemindersScreen() {
               </View>
 
               <View style={styles.formSection}>
+                <Text style={styles.formLabel}>Reminder Type *</Text>
+                <View style={styles.modeSelector}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeButton,
+                      reminderMode === 'recurring' && styles.modeButtonSelected
+                    ]}
+                    onPress={() => {
+                      setReminderMode('recurring');
+                      if (reminderDays.length === 0) {
+                        setReminderDays(['daily']);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.modeText,
+                      reminderMode === 'recurring' && styles.modeTextSelected
+                    ]}>
+                      Recurring
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeButton,
+                      reminderMode === 'one-time' && styles.modeButtonSelected
+                    ]}
+                    onPress={() => setReminderMode('one-time')}
+                  >
+                    <Text style={[
+                      styles.modeText,
+                      reminderMode === 'one-time' && styles.modeTextSelected
+                    ]}>
+                      One-Time
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.formSection}>
                 <Text style={styles.formLabel}>Time</Text>
                 <TextInput
                   style={styles.textInput}
@@ -294,28 +361,49 @@ export default function RemindersScreen() {
                 />
               </View>
 
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Days</Text>
-                <View style={styles.daysGrid}>
-                  {daysOfWeek.map((day) => (
-                    <TouchableOpacity
-                      key={day.id}
-                      style={[
-                        styles.dayChip,
-                        reminderDays.includes(day.id) && styles.dayChipSelected
-                      ]}
-                      onPress={() => toggleDay(day.id)}
-                    >
-                      <Text style={[
-                        styles.dayText,
-                        reminderDays.includes(day.id) && styles.dayTextSelected
-                      ]}>
-                        {day.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+              {reminderMode === 'recurring' && (
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>Days *</Text>
+                  <View style={styles.daysGrid}>
+                    {daysOfWeek.map((day) => (
+                      <TouchableOpacity
+                        key={day.id}
+                        style={[
+                          styles.dayChip,
+                          reminderDays.includes(day.id) && styles.dayChipSelected
+                        ]}
+                        onPress={() => toggleDay(day.id)}
+                      >
+                        <Text style={[
+                          styles.dayText,
+                          reminderDays.includes(day.id) && styles.dayTextSelected
+                        ]}>
+                          {day.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
+
+              {reminderMode === 'one-time' && (
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>Date *</Text>
+                  <View style={styles.dateInputContainer}>
+                    <Calendar size={20} color="#6A9FB5" style={styles.dateIcon} />
+                    <TextInput
+                      style={styles.dateInput}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#666666"
+                      value={reminderDate}
+                      onChangeText={setReminderDate}
+                    />
+                  </View>
+                  <Text style={styles.dateHint}>
+                    Format: YYYY-MM-DD (e.g., {new Date().toISOString().split('T')[0]})
+                  </Text>
+                </View>
+              )}
 
               <View style={styles.formSection}>
                 <Text style={styles.formLabel}>Note (Optional)</Text>
@@ -386,7 +474,14 @@ export default function RemindersScreen() {
                           <View style={styles.reminderDetails}>
                             <Clock size={14} color="#B0B0B0" />
                             <Text style={styles.reminderTime}>{formatTime(reminder.time)}</Text>
-                            <Text style={styles.reminderDays}>• {formatDays(reminder.days)}</Text>
+                            {reminder.reminderMode === 'one-time' && reminder.date ? (
+                              <>
+                                <Calendar size={14} color="#B0B0B0" style={{ marginLeft: 8 }} />
+                                <Text style={styles.reminderDays}>• {formatDate(reminder.date)}</Text>
+                              </>
+                            ) : (
+                              <Text style={styles.reminderDays}>• {formatDays(reminder.days)}</Text>
+                            )}
                           </View>
                           {reminder.customMessage && (
                             <Text style={styles.reminderNote}>{reminder.customMessage}</Text>
@@ -559,6 +654,57 @@ const styles = StyleSheet.create({
   },
   dayTextSelected: {
     color: '#FFFFFF',
+  },
+  modeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  modeButtonSelected: {
+    backgroundColor: '#6A9FB5',
+    borderColor: '#6A9FB5',
+  },
+  modeText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#B0B0B0',
+  },
+  modeTextSelected: {
+    color: '#FFFFFF',
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dateIcon: {
+    marginRight: 8,
+  },
+  dateInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+  },
+  dateHint: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-Regular',
+    color: '#888888',
+    marginTop: 4,
   },
   formButtons: {
     flexDirection: 'row',

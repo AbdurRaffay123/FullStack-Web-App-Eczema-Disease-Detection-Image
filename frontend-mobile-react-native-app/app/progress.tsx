@@ -1,170 +1,346 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Target, Award, ChartBar as BarChart3 } from 'lucide-react-native';
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Bell, BarChart3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { symptomService, SymptomLog } from '@/services/symptomService';
+import { reminderService, Reminder } from '@/services/reminderService';
 
 const { width } = Dimensions.get('window');
 
 export default function ProgressScreen() {
   const router = useRouter();
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [selectedPeriod, setSelectedPeriod] = useState('30');
+  const [logs, setLogs] = useState<SymptomLog[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingReminders, setIsLoadingReminders] = useState(true);
 
   const periods = [
-    { id: 'week', name: '7 Days' },
-    { id: 'month', name: '30 Days' },
-    { id: '3months', name: '3 Months' },
-    { id: 'year', name: '1 Year' },
+    { id: '7', name: '7 Days' },
+    { id: '30', name: '30 Days' },
+    { id: '90', name: '3 Months' },
   ];
 
-  const progressData = {
-    week: {
-      symptomsImprovement: 15,
-      averageItchiness: 2.3,
-      flareUpDays: 2,
-      medicationCompliance: 95,
-      moisturizingStreak: 6,
-    },
-    month: {
-      symptomsImprovement: 28,
-      averageItchiness: 2.1,
-      flareUpDays: 5,
-      medicationCompliance: 92,
-      moisturizingStreak: 23,
-    },
-    '3months': {
-      symptomsImprovement: 45,
-      averageItchiness: 1.8,
-      flareUpDays: 12,
-      medicationCompliance: 89,
-      moisturizingStreak: 67,
-    },
-    year: {
-      symptomsImprovement: 62,
-      averageItchiness: 1.5,
-      flareUpDays: 28,
-      medicationCompliance: 87,
-      moisturizingStreak: 245,
-    },
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    await Promise.all([loadLogs(), loadReminders()]);
   };
 
-  const weeklyData = [
-    { day: 'Mon', itchiness: 3, mood: 7, sleep: 8 },
-    { day: 'Tue', itchiness: 2, mood: 8, sleep: 7 },
-    { day: 'Wed', itchiness: 4, mood: 6, sleep: 6 },
-    { day: 'Thu', itchiness: 2, mood: 8, sleep: 8 },
-    { day: 'Fri', itchiness: 1, mood: 9, sleep: 9 },
-    { day: 'Sat', itchiness: 2, mood: 8, sleep: 8 },
-    { day: 'Sun', itchiness: 1, mood: 9, sleep: 9 },
-  ];
-
-  const achievements = [
-    {
-      id: 1,
-      title: 'Consistency Champion',
-      description: 'Logged symptoms for 7 days straight',
-      icon: Target,
-      color: '#28A745',
-      earned: true,
-      date: '2025-01-10',
-    },
-    {
-      id: 2,
-      title: 'Moisturizing Master',
-      description: 'Applied moisturizer daily for 30 days',
-      icon: Award,
-      color: '#6A9FB5',
-      earned: true,
-      date: '2025-01-05',
-    },
-    {
-      id: 3,
-      title: 'Improvement Tracker',
-      description: 'Reduced average itchiness by 50%',
-      icon: TrendingUp,
-      color: '#FFA500',
-      earned: false,
-      progress: 75,
-    },
-    {
-      id: 4,
-      title: 'Medication Adherence',
-      description: 'Perfect medication compliance for 14 days',
-      icon: Target,
-      color: '#DC3545',
-      earned: false,
-      progress: 60,
-    },
-  ];
-
-  const currentData = progressData[selectedPeriod as keyof typeof progressData];
-
-  const getItchinessColor = (level: number) => {
-    if (level <= 1) return '#28A745';
-    if (level <= 2) return '#FFA500';
-    if (level <= 3) return '#FF6B35';
-    return '#DC3545';
+  const loadLogs = async () => {
+    try {
+      setIsLoading(true);
+      const result = await symptomService.getLogs();
+      setLogs(result.logs);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to load symptom logs');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const renderChart = () => {
-    const maxValue = Math.max(...weeklyData.map(d => Math.max(d.itchiness, d.mood, d.sleep)));
-    const chartHeight = 120;
-    const barWidth = (width - 80) / weeklyData.length;
+  const loadReminders = async () => {
+    try {
+      setIsLoadingReminders(true);
+      const result = await reminderService.getReminders();
+      setReminders(result.reminders);
+    } catch (error: any) {
+      console.error('Failed to load reminders:', error);
+    } finally {
+      setIsLoadingReminders(false);
+    }
+  };
+
+  // Filter logs based on selected period
+  const filteredLogs = useMemo(() => {
+    const days = parseInt(selectedPeriod, 10);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    return logs.filter(log => {
+      const logDate = new Date(log.createdAt);
+      return logDate >= cutoffDate;
+    }).sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  }, [logs, selectedPeriod]);
+
+  // Calculate average itchiness
+  const averageItchiness = useMemo(() => {
+    if (filteredLogs.length === 0) return '0.0';
+    const sum = filteredLogs.reduce((acc, log) => acc + log.itchinessLevel, 0);
+    return (sum / filteredLogs.length).toFixed(1);
+  }, [filteredLogs]);
+
+  // Calculate itchiness change
+  const itchinessChange = useMemo(() => {
+    if (filteredLogs.length < 2) return null;
+    const midPoint = Math.floor(filteredLogs.length / 2);
+    const firstHalf = filteredLogs.slice(0, midPoint);
+    const secondHalf = filteredLogs.slice(midPoint);
+    const firstAvg = firstHalf.reduce((acc, log) => acc + log.itchinessLevel, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((acc, log) => acc + log.itchinessLevel, 0) / secondHalf.length;
+    if (firstAvg === 0) return null;
+    const change = ((secondAvg - firstAvg) / firstAvg) * 100;
+    return change.toFixed(0);
+  }, [filteredLogs]);
+
+  // Itchiness Level Trend Data
+  const itchinessData = useMemo(() => {
+    return filteredLogs.map(log => ({
+      date: new Date(log.createdAt).toISOString().split('T')[0],
+      level: log.itchinessLevel,
+    }));
+  }, [filteredLogs]);
+
+  // Monthly Flare-ups Data (last 5 months)
+  const flareUpData = useMemo(() => {
+    const fiveMonthsAgo = new Date();
+    fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 4);
+
+    const recentLogs = logs.filter(log => {
+      const logDate = new Date(log.createdAt);
+      return logDate >= fiveMonthsAgo && log.itchinessLevel >= 7;
+    });
+
+    const monthlyCounts = new Map<string, number>();
+    recentLogs.forEach(log => {
+      const logDate = new Date(log.createdAt);
+      const monthKey = logDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+    });
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const lastFiveMonths = [];
+    
+    for (let i = 0; i < 5; i++) {
+      const monthIndex = (currentMonth - i + 12) % 12;
+      const year = currentYear - (currentMonth < i ? 1 : 0);
+      lastFiveMonths.unshift({
+        month: `${monthNames[monthIndex]} ${year}`,
+        shortMonth: monthNames[monthIndex],
+        year: year,
+        count: 0
+      });
+    }
+
+    return lastFiveMonths.map(m => ({
+      month: m.shortMonth,
+      count: monthlyCounts.get(`${m.shortMonth} ${m.year}`) || 0
+    }));
+  }, [logs]);
+
+  const currentMonthFlareUps = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    return logs.filter(log => {
+      const logDate = new Date(log.createdAt);
+      return logDate.getMonth() === currentMonth && 
+             logDate.getFullYear() === currentYear && 
+             log.itchinessLevel >= 7;
+    }).length;
+  }, [logs]);
+
+  // Trigger Analysis Data
+  const triggerData = useMemo(() => {
+    const triggerCounts: { [key: string]: number } = {};
+    filteredLogs.forEach(log => {
+      if (log.possibleTriggers) {
+        const triggers = log.possibleTriggers.split(',').map(t => t.trim()).filter(t => t);
+        triggers.forEach(trigger => {
+          triggerCounts[trigger] = (triggerCounts[trigger] || 0) + 1;
+        });
+      }
+    });
+
+    const totalTriggers = Object.values(triggerCounts).reduce((sum, count) => sum + count, 0);
+    if (totalTriggers === 0) return [];
+
+    return Object.entries(triggerCounts)
+      .sort(([, countA], [, countB]) => countB - countA)
+      .slice(0, 6)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: parseFloat(((count / totalTriggers) * 100).toFixed(1)),
+      }));
+  }, [filteredLogs]);
+
+  // Reminder Tracking Data
+  const reminderChartData = useMemo(() => {
+    const monthlyCounts = new Map<string, number>();
+    const monthlyActive = new Map<string, number>();
+    
+    reminders.forEach(reminder => {
+      if (reminder.createdAt) {
+        const date = new Date(reminder.createdAt);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+        if (reminder.isActive) {
+          monthlyActive.set(monthKey, (monthlyActive.get(monthKey) || 0) + 1);
+        }
+      }
+    });
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const result = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const monthName = monthNames[date.getMonth()];
+      
+      result.push({
+        month: monthName,
+        monthKey,
+        total: monthlyCounts.get(monthKey) || 0,
+        active: monthlyActive.get(monthKey) || 0,
+        inactive: (monthlyCounts.get(monthKey) || 0) - (monthlyActive.get(monthKey) || 0)
+      });
+    }
+    
+    return result;
+  }, [reminders]);
+
+  const reminderStats = useMemo(() => {
+    const total = reminders.length;
+    const active = reminders.filter(r => r.isActive).length;
+    const byType = {
+      medication: reminders.filter(r => r.type === 'medication').length,
+      appointment: reminders.filter(r => r.type === 'appointment').length,
+      custom: reminders.filter(r => r.type === 'custom').length,
+    };
+    
+    return { total, active, inactive: total - active, byType };
+  }, [reminders]);
+
+  const renderItchinessChart = () => {
+    if (itchinessData.length === 0) return null;
+    
+    const maxLevel = Math.max(...itchinessData.map(d => d.level), 1);
+    const chartHeight = 150;
+    const barWidth = (width - 80) / Math.min(itchinessData.length, 7);
+    const displayData = itchinessData.slice(-7); // Show last 7 data points
 
     return (
       <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Weekly Overview</Text>
-        <View style={styles.chartLegend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#DC3545' }]} />
-            <Text style={styles.legendText}>Itchiness</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#6A9FB5' }]} />
-            <Text style={styles.legendText}>Mood</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#28A745' }]} />
-            <Text style={styles.legendText}>Sleep</Text>
-          </View>
-        </View>
-        
+        <Text style={styles.chartTitle}>Itchiness Level Trend</Text>
         <View style={[styles.chart, { height: chartHeight }]}>
-          {weeklyData.map((data, index) => (
-            <View key={data.day} style={[styles.chartDay, { width: barWidth }]}>
+          {displayData.map((data, index) => {
+            const date = new Date(data.date);
+            const dayLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <View key={index} style={[styles.chartBarContainer, { width: barWidth }]}>
+                <View style={styles.chartBars}>
+                  <View 
+                    style={[
+                      styles.chartBar,
+                      { 
+                        height: (data.level / maxLevel) * chartHeight,
+                        backgroundColor: data.level >= 7 ? '#DC3545' : data.level >= 4 ? '#FFA500' : '#28A745',
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.chartDayLabel}>{dayLabel}</Text>
+                <Text style={styles.chartValueLabel}>{data.level}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
+  const renderFlareUpChart = () => {
+    if (flareUpData.length === 0) return null;
+    
+    const maxCount = Math.max(...flareUpData.map(d => d.count), 1);
+    const chartHeight = 120;
+    const barWidth = (width - 80) / flareUpData.length;
+
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartTitle}>Monthly Flare-ups</Text>
+        <View style={[styles.chart, { height: chartHeight }]}>
+          {flareUpData.map((data, index) => (
+            <View key={index} style={[styles.chartBarContainer, { width: barWidth }]}>
               <View style={styles.chartBars}>
                 <View 
                   style={[
                     styles.chartBar,
                     { 
-                      height: (data.itchiness / maxValue) * chartHeight,
-                      backgroundColor: '#DC3545',
-                    }
-                  ]} 
-                />
-                <View 
-                  style={[
-                    styles.chartBar,
-                    { 
-                      height: (data.mood / maxValue) * chartHeight,
-                      backgroundColor: '#6A9FB5',
-                    }
-                  ]} 
-                />
-                <View 
-                  style={[
-                    styles.chartBar,
-                    { 
-                      height: (data.sleep / maxValue) * chartHeight,
-                      backgroundColor: '#28A745',
+                      height: (data.count / maxCount) * chartHeight,
+                      backgroundColor: '#C5B4E3',
                     }
                   ]} 
                 />
               </View>
-              <Text style={styles.chartDayLabel}>{data.day}</Text>
+              <Text style={styles.chartDayLabel}>{data.month}</Text>
+              <Text style={styles.chartValueLabel}>{data.count}</Text>
             </View>
           ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderReminderChart = () => {
+    if (reminderChartData.length === 0) return null;
+    
+    const maxCount = Math.max(...reminderChartData.map(d => d.total), 1);
+    const chartHeight = 120;
+    const barWidth = (width - 80) / reminderChartData.length;
+
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartTitle}>Reminder Tracking</Text>
+        <View style={[styles.chart, { height: chartHeight }]}>
+          {reminderChartData.map((data, index) => (
+            <View key={index} style={[styles.chartBarContainer, { width: barWidth }]}>
+              <View style={styles.chartBars}>
+                <View 
+                  style={[
+                    styles.chartBar,
+                    { 
+                      height: (data.inactive / maxCount) * chartHeight,
+                      backgroundColor: '#6B7280',
+                      marginBottom: 2,
+                    }
+                  ]} 
+                />
+                <View 
+                  style={[
+                    styles.chartBar,
+                    { 
+                      height: (data.active / maxCount) * chartHeight,
+                      backgroundColor: '#10B981',
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.chartDayLabel}>{data.month}</Text>
+              <Text style={styles.chartValueLabel}>{data.total}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.chartLegend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: '#10B981' }]} />
+            <Text style={styles.legendText}>Active</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: '#6B7280' }]} />
+            <Text style={styles.legendText}>Inactive</Text>
+          </View>
         </View>
       </View>
     );
@@ -211,25 +387,24 @@ export default function ProgressScreen() {
             </ScrollView>
           </View>
 
+          {/* Key Metrics */}
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
               <View style={styles.statHeader}>
                 <TrendingUp size={20} color="#28A745" />
-                <Text style={styles.statTitle}>Improvement</Text>
-              </View>
-              <Text style={styles.statValue}>+{currentData.symptomsImprovement}%</Text>
-              <Text style={styles.statSubtitle}>Symptoms reduced</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={styles.statHeader}>
-                <BarChart3 size={20} color="#6A9FB5" />
                 <Text style={styles.statTitle}>Avg. Itchiness</Text>
               </View>
-              <Text style={[styles.statValue, { color: getItchinessColor(currentData.averageItchiness) }]}>
-                {currentData.averageItchiness}/5
+              <Text style={styles.statValue}>
+                {isLoading ? '...' : averageItchiness}
               </Text>
-              <Text style={styles.statSubtitle}>Daily average</Text>
+              {itchinessChange !== null && (
+                <Text style={[
+                  styles.statChange,
+                  parseFloat(itchinessChange) < 0 ? { color: '#28A745' } : { color: '#DC3545' }
+                ]}>
+                  {parseFloat(itchinessChange) < 0 ? '↓' : '↑'} {Math.abs(parseFloat(itchinessChange))}%
+                </Text>
+              )}
             </View>
 
             <View style={styles.statCard}>
@@ -237,105 +412,80 @@ export default function ProgressScreen() {
                 <Calendar size={20} color="#FFA500" />
                 <Text style={styles.statTitle}>Flare-ups</Text>
               </View>
-              <Text style={styles.statValue}>{currentData.flareUpDays}</Text>
-              <Text style={styles.statSubtitle}>Days with flares</Text>
+              <Text style={styles.statValue}>
+                {isLoading ? '...' : currentMonthFlareUps}
+              </Text>
+              <Text style={styles.statSubtitle}>This Month</Text>
             </View>
 
             <View style={styles.statCard}>
               <View style={styles.statHeader}>
-                <Target size={20} color="#C5B4E3" />
-                <Text style={styles.statTitle}>Compliance</Text>
+                <Bell size={20} color="#6A9FB5" />
+                <Text style={styles.statTitle}>Reminders</Text>
               </View>
-              <Text style={styles.statValue}>{currentData.medicationCompliance}%</Text>
-              <Text style={styles.statSubtitle}>Medication taken</Text>
+              <Text style={styles.statValue}>
+                {isLoadingReminders ? '...' : reminderStats.total}
+              </Text>
+              <Text style={styles.statSubtitle}>
+                {reminderStats.active} active
+              </Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statHeader}>
+                <BarChart3 size={20} color="#C5B4E3" />
+                <Text style={styles.statTitle}>Logs</Text>
+              </View>
+              <Text style={styles.statValue}>
+                {isLoading ? '...' : filteredLogs.length}
+              </Text>
+              <Text style={styles.statSubtitle}>In period</Text>
             </View>
           </View>
 
-          {selectedPeriod === 'week' && renderChart()}
+          {/* Itchiness Level Trend */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#6A9FB5" />
+              <Text style={styles.loadingText}>Loading data...</Text>
+            </View>
+          ) : (
+            <>
+              {renderItchinessChart()}
 
-          <View style={styles.streakContainer}>
-            <LinearGradient
-              colors={['#6A9FB5', '#C5B4E3']}
-              style={styles.streakCard}
-            >
-              <View style={styles.streakHeader}>
-                <Award size={24} color="#FFFFFF" />
-                <Text style={styles.streakTitle}>Current Streak</Text>
-              </View>
-              <Text style={styles.streakValue}>{currentData.moisturizingStreak}</Text>
-              <Text style={styles.streakSubtitle}>Days of consistent moisturizing</Text>
-            </LinearGradient>
-          </View>
+              {/* Monthly Flare-ups */}
+              {renderFlareUpChart()}
 
-          <View style={styles.achievementsContainer}>
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            {achievements.map((achievement) => (
-              <View key={achievement.id} style={styles.achievementCard}>
-                <View style={styles.achievementLeft}>
-                  <View style={[
-                    styles.achievementIcon,
-                    { 
-                      backgroundColor: achievement.earned ? achievement.color : 'rgba(255, 255, 255, 0.1)',
-                      opacity: achievement.earned ? 1 : 0.5,
-                    }
-                  ]}>
-                    <achievement.icon 
-                      size={20} 
-                      color={achievement.earned ? '#FFFFFF' : '#B0B0B0'} 
-                    />
+              {/* Trigger Analysis */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Trigger Analysis</Text>
+                {triggerData.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No trigger data available</Text>
+                    <Text style={styles.emptySubtext}>Log symptoms with triggers to see analysis</Text>
                   </View>
-                  <View style={styles.achievementInfo}>
-                    <Text style={[
-                      styles.achievementTitle,
-                      { opacity: achievement.earned ? 1 : 0.7 }
-                    ]}>
-                      {achievement.title}
-                    </Text>
-                    <Text style={styles.achievementDescription}>
-                      {achievement.description}
-                    </Text>
-                    {achievement.earned && achievement.date && (
-                      <Text style={styles.achievementDate}>
-                        Earned on {achievement.date}
-                      </Text>
-                    )}
-                    {!achievement.earned && achievement.progress && (
-                      <View style={styles.progressContainer}>
-                        <View style={styles.progressBar}>
-                          <View 
-                            style={[
-                              styles.progressFill,
-                              { 
-                                width: `${achievement.progress}%`,
-                                backgroundColor: achievement.color,
-                              }
-                            ]} 
-                          />
+                ) : (
+                  <View style={styles.triggerList}>
+                    {triggerData.map((trigger, index) => (
+                      <View key={index} style={styles.triggerItem}>
+                        <View style={styles.triggerLeft}>
+                          <View style={[styles.triggerDot, { backgroundColor: `hsl(${index * 60}, 70%, 50%)` }]} />
+                          <Text style={styles.triggerName}>{trigger.name}</Text>
                         </View>
-                        <Text style={styles.progressText}>{achievement.progress}%</Text>
+                        <View style={styles.triggerRight}>
+                          <Text style={styles.triggerCount}>{trigger.count}x</Text>
+                          <Text style={styles.triggerPercentage}>{trigger.percentage}%</Text>
+                        </View>
                       </View>
-                    )}
+                    ))}
                   </View>
-                </View>
+                )}
               </View>
-            ))}
-          </View>
 
-          <View style={styles.insightsContainer}>
-            <Text style={styles.sectionTitle}>Insights</Text>
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>🎯 Keep it up!</Text>
-              <Text style={styles.insightText}>
-                Your consistency with moisturizing is paying off. Your average itchiness has decreased by 23% this month.
-              </Text>
-            </View>
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>💡 Tip</Text>
-              <Text style={styles.insightText}>
-                You tend to have better days when you sleep 8+ hours. Consider maintaining a regular sleep schedule.
-              </Text>
-            </View>
-          </View>
+              {/* Reminder Tracking */}
+              {renderReminderChart()}
+            </>
+          )}
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -408,6 +558,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     gap: 12,
+    marginBottom: 16,
   },
   statCard: {
     width: (width - 44) / 2,
@@ -439,6 +590,11 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans-Regular',
     color: '#888888',
   },
+  statChange: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-SemiBold',
+    marginTop: 4,
+  },
   chartContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     margin: 16,
@@ -451,12 +607,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
     color: '#FFFFFF',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  chart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  chartBarContainer: {
+    alignItems: 'center',
+  },
+  chartBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: '100%',
+    gap: 2,
+  },
+  chartBar: {
+    width: 20,
+    borderRadius: 4,
+    minHeight: 4,
+  },
+  chartDayLabel: {
+    fontSize: 10,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginTop: 8,
+  },
+  chartValueLabel: {
+    fontSize: 10,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+    marginTop: 4,
   },
   chartLegend: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 12,
   },
   legendItem: {
     flexDirection: 'row',
@@ -473,155 +662,87 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans-Regular',
     color: '#B0B0B0',
   },
-  chart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  chartDay: {
-    alignItems: 'center',
-  },
-  chartBars: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: '100%',
-    gap: 2,
-  },
-  chartBar: {
-    width: 8,
-    borderRadius: 4,
-    minHeight: 4,
-  },
-  chartDayLabel: {
-    fontSize: 10,
-    fontFamily: 'OpenSans-Regular',
-    color: '#B0B0B0',
-    marginTop: 8,
-  },
-  streakContainer: {
-    padding: 16,
-  },
-  streakCard: {
+  sectionContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    margin: 16,
     borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-  streakHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  streakTitle: {
-    fontSize: 16,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#FFFFFF',
-    marginLeft: 8,
-  },
-  streakValue: {
-    fontSize: 36,
-    fontFamily: 'OpenSans-Bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  streakSubtitle: {
-    fontSize: 14,
-    fontFamily: 'OpenSans-Regular',
-    color: '#FFFFFF',
-    opacity: 0.9,
-    textAlign: 'center',
-  },
-  achievementsContainer: {
     padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
     color: '#FFFFFF',
     marginBottom: 16,
   },
-  achievementCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+  triggerList: {
+    gap: 12,
   },
-  achievementLeft: {
+  triggerItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  achievementIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 8,
+  },
+  triggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  triggerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 12,
   },
-  achievementInfo: {
-    flex: 1,
-  },
-  achievementTitle: {
-    fontSize: 16,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  achievementDescription: {
+  triggerName: {
     fontSize: 14,
     fontFamily: 'OpenSans-Regular',
-    color: '#B0B0B0',
-    marginBottom: 4,
+    color: '#FFFFFF',
   },
-  achievementDate: {
-    fontSize: 12,
-    fontFamily: 'OpenSans-Regular',
-    color: '#28A745',
-  },
-  progressContainer: {
+  triggerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    gap: 8,
   },
-  progressBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 3,
-    marginRight: 8,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  progressText: {
+  triggerCount: {
     fontSize: 12,
     fontFamily: 'OpenSans-Regular',
     color: '#B0B0B0',
   },
-  insightsContainer: {
-    padding: 16,
-    paddingTop: 0,
-  },
-  insightCard: {
-    backgroundColor: 'rgba(106, 159, 181, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(106, 159, 181, 0.2)',
-  },
-  insightTitle: {
-    fontSize: 16,
+  triggerPercentage: {
+    fontSize: 14,
     fontFamily: 'OpenSans-SemiBold',
     color: '#6A9FB5',
-    marginBottom: 8,
+    minWidth: 50,
+    textAlign: 'right',
   },
-  insightText: {
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 48,
+  },
+  loadingText: {
+    color: '#B0B0B0',
     fontSize: 14,
     fontFamily: 'OpenSans-Regular',
-    color: '#FFFFFF',
-    lineHeight: 20,
+    marginTop: 16,
   },
+  emptyState: {
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginBottom: 4,
+  },
+  emptySubtext: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-Regular',
+    color: '#888888',
+  },
+});
+
 });

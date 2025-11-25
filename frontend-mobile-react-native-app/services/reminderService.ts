@@ -6,7 +6,9 @@ export interface Reminder {
   title: string;
   type: 'medication' | 'appointment' | 'custom';
   time: string;
-  days: string[];
+  reminderMode?: 'recurring' | 'one-time';
+  days?: string[];
+  date?: string;
   customMessage?: string;
   isActive: boolean;
   timezone?: string;
@@ -19,7 +21,9 @@ export interface CreateReminderData {
   title: string;
   type: 'medication' | 'appointment' | 'custom';
   time: string;
-  days: string[];
+  reminderMode?: 'recurring' | 'one-time';
+  days?: string[];
+  date?: string;
   customMessage?: string;
   timezone?: string;
 }
@@ -28,7 +32,9 @@ export interface UpdateReminderData {
   title?: string;
   type?: 'medication' | 'appointment' | 'custom';
   time?: string;
+  reminderMode?: 'recurring' | 'one-time';
   days?: string[];
+  date?: string;
   customMessage?: string;
   isActive?: boolean;
   timezone?: string;
