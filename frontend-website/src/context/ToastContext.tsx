@@ -8,7 +8,7 @@ interface Toast {
 
 interface ToastContextType {
   toasts: Toast[];
-  showToast: (message: string, type: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type: 'success' | 'error' | 'info', duration?: number) => void;
   removeToast: (id: string) => void;
 }
 
@@ -25,13 +25,13 @@ export const useToast = () => {
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+  const showToast = (message: string, type: 'success' | 'error' | 'info', duration: number = 4000) => {
     const id = Math.random().toString(36).substring(7);
     setToasts(prev => [...prev, { id, message, type }]);
     
     setTimeout(() => {
       removeToast(id);
-    }, 4000);
+    }, duration);
   };
 
   const removeToast = (id: string) => {

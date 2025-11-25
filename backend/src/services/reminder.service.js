@@ -128,13 +128,20 @@ const deleteReminder = async (reminderId, userId) => {
 
 /**
  * Get Active Reminders Due for Triggering
+ * Checks reminders where nextTriggerTime is less than or equal to current time
+ * Also includes a small buffer (5 seconds) to catch reminders that just became due
  */
 const getDueReminders = async () => {
   const now = new Date();
+  // Add a small buffer to catch reminders that just became due
+  const bufferTime = new Date(now.getTime() + 5000); // 5 second buffer
   
   const reminders = await Reminder.find({
     isActive: true,
-    nextTriggerTime: { $lte: now },
+    nextTriggerTime: { 
+      $lte: bufferTime,
+      $ne: null 
+    },
   }).populate('user', 'email name');
 
   return reminders;
