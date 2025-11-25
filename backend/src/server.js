@@ -1,6 +1,7 @@
 const app = require('./app');
 const connectDB = require('./config/db');
 const appConfig = require('./config/appConfig');
+const { startScheduler } = require('./jobs/reminder.job');
 
 /**
  * Validate Required Environment Variables
@@ -40,6 +41,9 @@ const startServer = async () => {
       console.log(`🌍 Environment: ${appConfig.NODE_ENV}`);
       console.log(`📡 API Base URL: http://localhost:${PORT}/api`);
       console.log(`✅ JWT_SECRET: ${process.env.JWT_SECRET ? 'Set ✓' : 'Missing ✗'}`);
+      
+      // Start reminder scheduler
+      startScheduler();
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

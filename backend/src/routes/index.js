@@ -5,14 +5,15 @@ const router = express.Router();
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
 const symptomRoutes = require('./symptom.routes');
+const reminderRoutes = require('./reminder.routes');
+const notificationRoutes = require('./notification.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/logs', symptomRoutes);
-
-// Add more route modules here as they are created
-// etc.
+router.use('/reminders', reminderRoutes);
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;
 

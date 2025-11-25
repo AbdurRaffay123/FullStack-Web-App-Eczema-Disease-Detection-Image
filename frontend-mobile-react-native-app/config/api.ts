@@ -59,8 +59,15 @@ export const API_ENDPOINTS = {
   REMINDERS: {
     LIST: '/reminders',
     CREATE: '/reminders',
+    GET: '/reminders/:id',
     UPDATE: '/reminders/:id',
     DELETE: '/reminders/:id',
+  },
+  
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    MARK_READ: '/notifications/:id/read',
+    MARK_ALL_READ: '/notifications/read-all',
   },
   
   CONSULTATIONS: {

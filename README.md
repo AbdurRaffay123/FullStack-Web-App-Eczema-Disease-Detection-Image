@@ -97,7 +97,7 @@ EXPO_PUBLIC_API_URL=http://localhost:3000/api
 
 4. Start the Expo development server:
 ```bash
-npm run dev
+npx expo start --clear
 ```
 
 This will:

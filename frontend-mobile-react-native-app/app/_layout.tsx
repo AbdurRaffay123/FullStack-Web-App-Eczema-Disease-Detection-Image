@@ -9,6 +9,17 @@ import {
 } from '@expo-google-fonts/open-sans';
 import { SplashScreen } from 'expo-router';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
+// Configure notification handler for background notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -21,6 +32,25 @@ export default function RootLayout() {
     'OpenSans-SemiBold': OpenSans_600SemiBold,
     'OpenSans-Bold': OpenSans_700Bold,
   });
+
+  // Set up notification listeners
+  useEffect(() => {
+    // Handle notification received while app is in foreground
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received:', notification);
+    });
+
+    // Handle notification tapped/opened
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification response:', response);
+      // You can navigate to notifications screen here if needed
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener);
+      Notifications.removeNotificationSubscription(responseListener);
+    };
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -41,6 +71,7 @@ export default function RootLayout() {
         <Stack.Screen name="consult" />
         <Stack.Screen name="progress" />
         <Stack.Screen name="reminders" />
+        <Stack.Screen name="notifications" />
         <Stack.Screen name="tips" />
         <Stack.Screen name="+not-found" />
       </Stack>

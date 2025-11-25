@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotificationPolling } from '../hooks/useNotificationPolling';
+import NotificationsPanel from './NotificationsPanel';
 import { 
   Home, 
   Camera, 
@@ -21,6 +23,12 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  // Start notification polling when user is logged in
+  const { notifications } = useNotificationPolling(!!user);
+  
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -80,10 +88,35 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="p-8">
+        <div className="p-8 relative">
+          {/* Notifications Bell */}
+          {user && (
+            <div className="fixed top-4 right-4 z-40">
+              <button
+                onClick={() => setShowNotifications(true)}
+                className="relative p-3 bg-[#6A9FB5] hover:bg-[#5A8FA5] rounded-full transition-all shadow-lg"
+              >
+                <Bell className="h-6 w-6 text-white" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+          
           {children}
         </div>
       </div>
+
+      {/* Notifications Panel */}
+      {user && (
+        <NotificationsPanel
+          isOpen={showNotifications}
+          onClose={() => setShowNotifications(false)}
+        />
+      )}
     </div>
   );
 };

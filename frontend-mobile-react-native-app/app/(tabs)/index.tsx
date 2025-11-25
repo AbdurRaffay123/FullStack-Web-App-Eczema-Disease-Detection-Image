@@ -3,9 +3,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, FileText, Lightbulb, Brain, Bell, TrendingUp, Stethoscope } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect } from 'react';
+import { syncReminders } from '@/utils/reminderSync';
+import { requestNotificationPermissions } from '@/utils/notificationScheduler';
+import { authService } from '@/services/authService';
 
 export default function HomeScreen() {
   const router = useRouter();
+
+  // Sync reminders on mount if user is authenticated
+  useEffect(() => {
+    const initializeReminders = async () => {
+      try {
+        const isAuthenticated = await authService.isAuthenticated();
+        if (isAuthenticated) {
+          // Request notification permissions
+          await requestNotificationPermissions();
+          // Sync reminders from backend
+          await syncReminders();
+        }
+      } catch (error) {
+        console.error('Error initializing reminders:', error);
+      }
+    };
+
+    initializeReminders();
+  }, []);
 
   const features = [
     {
