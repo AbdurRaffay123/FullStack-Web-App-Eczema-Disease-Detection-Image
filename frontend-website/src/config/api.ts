@@ -74,8 +74,8 @@ export const API_ENDPOINTS = {
   CONSULTATIONS: {
     LIST: '/consultations',
     CREATE: '/consultations',
-    UPDATE: '/consultations/:id',
-    CANCEL: '/consultations/:id/cancel',
+    GET: '/consultations/:id',
+    DELETE: '/consultations/:id',
   },
   
   PROGRESS: {

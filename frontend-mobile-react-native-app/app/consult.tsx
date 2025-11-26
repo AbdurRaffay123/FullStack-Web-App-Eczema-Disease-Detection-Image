@@ -1,13 +1,41 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, Alert, TextInput, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Phone, MessageCircle, Video, Star, MapPin, Clock, Calendar } from 'lucide-react-native';
+import { ArrowLeft, Phone, MessageCircle, Video, Star, MapPin, Clock, Calendar, User, Mail, X, CheckCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState, useEffect } from 'react';
+import { consultationService, CreateConsultationData } from '@/services/consultationService';
+import { userService, UserProfile } from '@/services/userService';
+
+interface Doctor {
+  id: number;
+  name: string;
+  specialty: string;
+  rating: number;
+  reviews: number;
+  experience: string;
+  location: string;
+  image: string;
+  availability: string;
+  consultationFee: string;
+  languages: string[];
+  phone: string;
+  email: string;
+}
 
 export default function ConsultScreen() {
   const router = useRouter();
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [consultationType, setConsultationType] = useState<'video' | 'phone' | 'chat'>('video');
+  const [preferredDate, setPreferredDate] = useState<string>('');
+  const [preferredTime, setPreferredTime] = useState<string>('');
+  const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
-  const specialists = [
+  const specialists: Doctor[] = [
     {
       id: 1,
       name: 'Dr. Junaid',
@@ -20,6 +48,8 @@ export default function ConsultScreen() {
       availability: 'Available Today',
       consultationFee: '$150',
       languages: ['English', 'Urdu'],
+      phone: '+92 300 1234567',
+      email: 'dr.junaid@healthcare.com',
     },
     {
       id: 2,
@@ -33,6 +63,8 @@ export default function ConsultScreen() {
       availability: 'Available Tomorrow',
       consultationFee: '$175',
       languages: ['English', 'Urdu'],
+      phone: '+92 300 2345678',
+      email: 'dr.senan@healthcare.com',
     },
     {
       id: 3,
@@ -46,6 +78,8 @@ export default function ConsultScreen() {
       availability: 'Available Today',
       consultationFee: '$160',
       languages: ['English', 'Urdu', 'Punjabi'],
+      phone: '+92 300 3456789',
+      email: 'dr.waseem@healthcare.com',
     },
   ];
 
@@ -76,13 +110,137 @@ export default function ConsultScreen() {
     },
   ];
 
-  const handleBookConsultation = (doctorId: number, type: string) => {
-    // In a real app, this would navigate to booking flow
-    router.push(`/booking?doctor=${doctorId}&type=${type}`);
+  // Load user profile on mount
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setIsLoadingProfile(true);
+      const profile = await userService.getProfile();
+      setUserProfile(profile);
+    } catch (error: any) {
+      console.error('Failed to load profile:', error);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleBookConsultation = (doctor: Doctor, type: 'video' | 'phone' | 'chat') => {
+    setSelectedDoctor(doctor);
+    setConsultationType(type);
+    setShowBookingModal(true);
+    // Reset form - set tomorrow as default date
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setPreferredDate(tomorrow.toISOString().split('T')[0]); // YYYY-MM-DD
+    setPreferredTime('09:00'); // Default time
+    setReason('');
+  };
+
+  const handleSubmitBooking = async () => {
+    if (!selectedDoctor) return;
+
+    // Validate form
+    if (!reason.trim() || reason.trim().length < 10) {
+      Alert.alert('Validation Error', 'Please provide a reason for consultation (at least 10 characters)');
+      return;
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(preferredDate)) {
+      Alert.alert('Validation Error', 'Please enter a valid date in YYYY-MM-DD format');
+      return;
+    }
+
+    // Validate time format
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(preferredTime)) {
+      Alert.alert('Validation Error', 'Please enter a valid time in HH:MM format (24-hour)');
+      return;
+    }
+
+    // Check if date is in the future
+    const selectedDateTime = new Date(preferredDate);
+    const [hours, minutes] = preferredTime.split(':').map(Number);
+    selectedDateTime.setHours(hours, minutes, 0, 0);
+    
+    if (selectedDateTime <= new Date()) {
+      Alert.alert('Validation Error', 'Preferred date and time must be in the future');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const bookingData: CreateConsultationData = {
+        consultationType,
+        preferredDate: preferredDate, // Already in YYYY-MM-DD format
+        preferredTime: preferredTime, // Already in HH:MM format
+        reason: reason.trim(),
+        doctorName: selectedDoctor.name,
+        doctorEmail: selectedDoctor.email,
+        doctorPhone: selectedDoctor.phone,
+      };
+
+      await consultationService.createConsultation(bookingData);
+      Alert.alert(
+        'Success',
+        `Consultation with ${selectedDoctor.name} booked successfully!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowBookingModal(false);
+              setSelectedDoctor(null);
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      // Handle profile incomplete error
+      if (error.message?.includes('PROFILE_INCOMPLETE')) {
+        const errorMsg = error.message.replace('PROFILE_INCOMPLETE: ', '');
+        Alert.alert(
+          'Profile Incomplete',
+          errorMsg,
+          [
+            {
+              text: 'Go to Profile',
+              onPress: () => {
+                setShowBookingModal(false);
+                router.push('/(tabs)/profile');
+              },
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', error.message || 'Failed to book consultation');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEmergencyCall = () => {
     Linking.openURL('tel:911');
+  };
+
+  const formatDateDisplay = (dateString: string) => {
+    if (!dateString) return 'Select date';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getMinDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
   };
 
   return (
@@ -157,6 +315,14 @@ export default function ConsultScreen() {
                       <Calendar size={14} color="#28A745" />
                       <Text style={[styles.detailText, { color: '#28A745' }]}>{doctor.availability}</Text>
                     </View>
+                    <View style={styles.detailItem}>
+                      <Phone size={14} color="#6A9FB5" />
+                      <Text style={styles.detailText}>{doctor.phone}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Mail size={14} color="#6A9FB5" />
+                      <Text style={styles.detailText} numberOfLines={1}>{doctor.email}</Text>
+                    </View>
                   </View>
 
                   <View style={styles.languagesContainer}>
@@ -172,21 +338,21 @@ export default function ConsultScreen() {
                     <View style={styles.actionButtons}>
                       <TouchableOpacity 
                         style={[styles.actionButton, styles.videoButton]}
-                        onPress={() => handleBookConsultation(doctor.id, 'video')}
+                        onPress={() => handleBookConsultation(doctor, 'video')}
                       >
                         <Video size={16} color="#FFFFFF" />
                         <Text style={styles.actionButtonText}>Video</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         style={[styles.actionButton, styles.phoneButton]}
-                        onPress={() => handleBookConsultation(doctor.id, 'phone')}
+                        onPress={() => handleBookConsultation(doctor, 'phone')}
                       >
                         <Phone size={16} color="#FFFFFF" />
                         <Text style={styles.actionButtonText}>Call</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         style={[styles.actionButton, styles.chatButton]}
-                        onPress={() => handleBookConsultation(doctor.id, 'chat')}
+                        onPress={() => handleBookConsultation(doctor, 'chat')}
                       >
                         <MessageCircle size={16} color="#FFFFFF" />
                         <Text style={styles.actionButtonText}>Chat</Text>
@@ -222,6 +388,204 @@ export default function ConsultScreen() {
             </View>
           </View>
         </ScrollView>
+
+        {/* Booking Modal */}
+        <Modal
+          visible={showBookingModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowBookingModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Book Consultation</Text>
+                <TouchableOpacity
+                  onPress={() => setShowBookingModal(false)}
+                  style={styles.closeButton}
+                >
+                  <X size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {selectedDoctor && (
+                <View style={styles.doctorInfoModal}>
+                  <Image source={{ uri: selectedDoctor.image }} style={styles.doctorImageModal} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.doctorNameModal}>{selectedDoctor.name}</Text>
+                    <Text style={styles.doctorSpecialtyModal}>{selectedDoctor.specialty}</Text>
+                    <View style={{ marginTop: 8, gap: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Phone size={12} color="#6A9FB5" />
+                        <Text style={[styles.detailText, { fontSize: 12 }]}>{selectedDoctor.phone}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Mail size={12} color="#6A9FB5" />
+                        <Text style={[styles.detailText, { fontSize: 12 }]} numberOfLines={1}>{selectedDoctor.email}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* User Profile Info (Auto-filled, Read-only) */}
+              {isLoadingProfile ? (
+                <View style={styles.profileSection}>
+                  <ActivityIndicator size="small" color="#6A9FB5" />
+                  <Text style={styles.profileLoadingText}>Loading profile...</Text>
+                </View>
+              ) : userProfile ? (
+                <View style={styles.profileSection}>
+                  <Text style={styles.profileSectionTitle}>Your Information</Text>
+                  <View style={styles.profileInfo}>
+                    <View style={styles.profileRow}>
+                      <User size={16} color="#6A9FB5" />
+                      <Text style={styles.profileText}>{userProfile.fullName || userProfile.name}</Text>
+                    </View>
+                    <View style={styles.profileRow}>
+                      <Mail size={16} color="#6A9FB5" />
+                      <Text style={styles.profileText}>{userProfile.email}</Text>
+                    </View>
+                    {userProfile.phoneNumber && (
+                      <View style={styles.profileRow}>
+                        <Phone size={16} color="#6A9FB5" />
+                        <Text style={styles.profileText}>{userProfile.phoneNumber}</Text>
+                      </View>
+                    )}
+                    {userProfile.dateOfBirth && (
+                      <View style={styles.profileRow}>
+                        <Calendar size={16} color="#6A9FB5" />
+                        <Text style={styles.profileText}>
+                          {new Date(userProfile.dateOfBirth).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ) : null}
+
+              <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+                {/* Consultation Type */}
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>Consultation Type *</Text>
+                  <View style={styles.typeButtons}>
+                    {consultationTypes.map((type) => {
+                      const IconComponent = type.icon;
+                      const isSelected = consultationType === type.id;
+                      return (
+                        <TouchableOpacity
+                          key={type.id}
+                          style={[
+                            styles.typeButton,
+                            isSelected && { backgroundColor: type.color, borderColor: type.color },
+                          ]}
+                          onPress={() => setConsultationType(type.id as 'video' | 'phone' | 'chat')}
+                        >
+                          <IconComponent size={20} color={isSelected ? '#FFFFFF' : type.color} />
+                          <Text
+                            style={[
+                              styles.typeButtonText,
+                              isSelected && styles.typeButtonTextSelected,
+                            ]}
+                          >
+                            {type.title.replace(' Consultation', '')}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Preferred Date */}
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>Preferred Date *</Text>
+                  <View style={styles.dateTimeButton}>
+                    <Calendar size={20} color="#6A9FB5" />
+                    <TextInput
+                      style={styles.dateTimeInput}
+                      value={preferredDate}
+                      onChangeText={setPreferredDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#666666"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  {preferredDate && (
+                    <Text style={styles.dateDisplayText}>{formatDateDisplay(preferredDate)}</Text>
+                  )}
+                  <Text style={styles.helperText}>Minimum date: {getMinDate()}</Text>
+                </View>
+
+                {/* Preferred Time */}
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>Preferred Time *</Text>
+                  <View style={styles.dateTimeButton}>
+                    <Clock size={20} color="#6A9FB5" />
+                    <TextInput
+                      style={styles.dateTimeInput}
+                      value={preferredTime}
+                      onChangeText={(text) => {
+                        // Format as HH:MM
+                        const formatted = text.replace(/[^\d]/g, '').slice(0, 4);
+                        if (formatted.length <= 2) {
+                          setPreferredTime(formatted);
+                        } else {
+                          setPreferredTime(`${formatted.slice(0, 2)}:${formatted.slice(2)}`);
+                        }
+                      }}
+                      placeholder="HH:MM (24-hour)"
+                      placeholderTextColor="#666666"
+                      keyboardType="numeric"
+                      maxLength={5}
+                    />
+                  </View>
+                  <Text style={styles.helperText}>Format: HH:MM (e.g., 14:30 for 2:30 PM)</Text>
+                </View>
+
+                {/* Reason */}
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>Reason for Consultation *</Text>
+                  <TextInput
+                    style={styles.reasonInput}
+                    value={reason}
+                    onChangeText={setReason}
+                    placeholder="Briefly describe your symptoms or concerns (minimum 10 characters)..."
+                    placeholderTextColor="#666666"
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                  <Text style={styles.charCount}>{reason.length}/1000 characters</Text>
+                </View>
+              </ScrollView>
+
+              {/* Submit Button */}
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                  onPress={handleSubmitBooking}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <CheckCircle size={20} color="#FFFFFF" />
+                      <Text style={styles.submitButtonText}>Confirm Booking</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowBookingModal(false)}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -415,6 +779,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   languageTag: {
     backgroundColor: 'rgba(106, 159, 181, 0.2)',
@@ -500,5 +866,211 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans-Regular',
     color: '#FFFFFF',
     lineHeight: 20,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1A1A2E',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFFFFF',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  doctorInfoModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 12,
+  },
+  doctorImageModal: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  doctorNameModal: {
+    fontSize: 18,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  doctorSpecialtyModal: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#6A9FB5',
+  },
+  profileSection: {
+    padding: 20,
+    backgroundColor: 'rgba(106, 159, 181, 0.1)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  profileSectionTitle: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#6A9FB5',
+    marginBottom: 12,
+  },
+  profileInfo: {
+    gap: 8,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  profileText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+  },
+  profileLoadingText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginTop: 8,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  formSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  formLabel: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  typeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  typeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(106, 159, 181, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    gap: 6,
+  },
+  typeButtonText: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#6A9FB5',
+  },
+  typeButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  dateTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    gap: 12,
+  },
+  dateTimeInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  dateDisplayText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#6A9FB5',
+    marginTop: 8,
+  },
+  helperText: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-Regular',
+    color: '#888888',
+    marginTop: 4,
+  },
+  reasonInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    fontSize: 12,
+    fontFamily: 'OpenSans-Regular',
+    color: '#888888',
+    marginTop: 8,
+    textAlign: 'right',
+  },
+  modalFooter: {
+    padding: 20,
+    gap: 12,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6A9FB5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+  },
+  cancelButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#888888',
   },
 });

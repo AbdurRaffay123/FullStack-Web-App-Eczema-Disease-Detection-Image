@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { consultationService, CreateConsultationData } from '../services/consultationService';
+import { userService } from '../services/userService';
 import { 
   Search, 
   Filter, 
@@ -11,7 +15,10 @@ import {
   Clock,
   Calendar,
   AlertCircle,
-  Stethoscope
+  Stethoscope,
+  User,
+  Mail,
+  Phone as PhoneIcon
 } from 'lucide-react';
 
 interface Doctor {
@@ -26,6 +33,8 @@ interface Doctor {
   consultationTypes: string[];
   languages: string[];
   experience: string;
+  phone: string;
+  email: string;
   price: {
     video: number;
     phone: number;
@@ -34,15 +43,42 @@ interface Doctor {
 }
 
 const Consultation: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCity, setSelectedCity] = useState('All Cities');
   const [selectedType, setSelectedType] = useState('All Types');
   const [showBooking, setShowBooking] = useState<Doctor | null>(null);
-  const [bookingType, setBookingType] = useState('video');
-  const { showToast } = useToast();
+  const [bookingType, setBookingType] = useState<'video' | 'phone' | 'chat'>('video');
+  const [preferredDate, setPreferredDate] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
+  const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   const cities = ['All Cities', 'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio'];
   const consultationTypes = ['All Types', 'Video Call', 'Phone Call', 'Chat'];
+
+  // Load user profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoadingProfile(true);
+        const profile = await userService.getProfile();
+        setUserProfile(profile);
+      } catch (error: any) {
+        console.error('Failed to load profile:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    if (user) {
+      loadProfile();
+    }
+  }, [user]);
 
   const doctors: Doctor[] = [
     {
@@ -57,6 +93,8 @@ const Consultation: React.FC = () => {
       consultationTypes: ['video', 'phone', 'chat'],
       languages: ['English', 'Spanish'],
       experience: '12 years',
+      phone: '+1 (212) 555-0123',
+      email: 'abdurraffaykhan0732@gmail.com',
       price: {
         video: 150,
         phone: 120,
@@ -75,6 +113,8 @@ const Consultation: React.FC = () => {
       consultationTypes: ['video', 'phone'],
       languages: ['English', 'Mandarin'],
       experience: '8 years',
+      phone: '+1 (310) 555-0456',
+      email: 'michael.chen@healthcare.com',
       price: {
         video: 180,
         phone: 140,
@@ -93,6 +133,8 @@ const Consultation: React.FC = () => {
       consultationTypes: ['video', 'phone', 'chat'],
       languages: ['English', 'Spanish', 'Portuguese'],
       experience: '15 years',
+      phone: '+1 (312) 555-0789',
+      email: 'emily.rodriguez@healthcare.com',
       price: {
         video: 200,
         phone: 160,
@@ -111,6 +153,8 @@ const Consultation: React.FC = () => {
       consultationTypes: ['video', 'chat'],
       languages: ['English', 'Hindi'],
       experience: '10 years',
+      phone: '+1 (713) 555-0321',
+      email: 'david.kumar@healthcare.com',
       price: {
         video: 130,
         phone: 0,
@@ -130,11 +174,57 @@ const Consultation: React.FC = () => {
     return matchesSearch && matchesCity && matchesType;
   });
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (!showBooking) return;
-    
-    showToast(`Consultation with ${showBooking.name} booked successfully!`, 'success');
-    setShowBooking(null);
+
+    // Validate form
+    if (!preferredDate) {
+      showToast('Please select a preferred date', 'error');
+      return;
+    }
+
+    if (!preferredTime) {
+      showToast('Please select a preferred time', 'error');
+      return;
+    }
+
+    if (!reason.trim() || reason.trim().length < 10) {
+      showToast('Please provide a reason for consultation (at least 10 characters)', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const bookingData: CreateConsultationData = {
+        consultationType: bookingType,
+        preferredDate: preferredDate,
+        preferredTime: preferredTime,
+        reason: reason.trim(),
+        doctorName: showBooking.name,
+        doctorEmail: showBooking.email,
+        doctorPhone: showBooking.phone,
+      };
+
+      await consultationService.createConsultation(bookingData);
+      showToast(`Consultation with ${showBooking.name} booked successfully!`, 'success');
+      setShowBooking(null);
+      setPreferredDate('');
+      setPreferredTime('');
+      setReason('');
+    } catch (error: any) {
+      // Handle profile incomplete error
+      if (error.message.includes('PROFILE_INCOMPLETE')) {
+        const errorMsg = error.message.replace('PROFILE_INCOMPLETE: ', '');
+        showToast(errorMsg, 'error');
+        setTimeout(() => {
+          navigate('/profile');
+        }, 2000);
+      } else {
+        showToast(error.message || 'Failed to book consultation', 'error');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getConsultationIcon = (type: string) => {
@@ -157,6 +247,13 @@ const Consultation: React.FC = () => {
         className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-400'}`}
       />
     ));
+  };
+
+  // Calculate minimum date (today)
+  const getMinDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
   };
 
   return (
@@ -257,20 +354,28 @@ const Consultation: React.FC = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 text-sm">
               <div className="flex items-center space-x-2 text-gray-300">
-                <MapPin className="h-4 w-4" />
-                <span>{doctor.location}</span>
+                <MapPin className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{doctor.location}</span>
               </div>
               <div className="flex items-center space-x-2 text-gray-300">
-                <Clock className="h-4 w-4" />
-                <span>{doctor.availability}</span>
+                <Clock className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{doctor.availability}</span>
               </div>
               <div className="flex items-center space-x-2 text-gray-300">
-                <Stethoscope className="h-4 w-4" />
+                <Stethoscope className="h-4 w-4 flex-shrink-0" />
                 <span>{doctor.experience} experience</span>
               </div>
-              <div className="text-gray-300">
+              <div className="flex items-center space-x-2 text-gray-300">
+                <PhoneIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{doctor.phone}</span>
+              </div>
+              <div className="flex items-center space-x-2 text-gray-300">
+                <Mail className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{doctor.email}</span>
+              </div>
+              <div className="text-gray-300 col-span-2 md:col-span-1">
                 <span>Languages: {doctor.languages.join(', ')}</span>
               </div>
             </div>
@@ -313,7 +418,7 @@ const Consultation: React.FC = () => {
       {/* Booking Modal */}
       {showBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1A1A2E] border border-white border-opacity-20 rounded-2xl p-8 max-w-md w-full">
+          <div className="bg-[#1A1A2E] border border-white border-opacity-20 rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-white mb-6">Book Consultation</h2>
             
             <div className="flex items-center space-x-4 mb-6">
@@ -322,16 +427,57 @@ const Consultation: React.FC = () => {
                 alt={showBooking.name}
                 className="w-12 h-12 rounded-full object-cover"
               />
-              <div>
+              <div className="flex-1">
                 <h3 className="text-lg font-semibold text-white">{showBooking.name}</h3>
                 <p className="text-[#6A9FB5]">{showBooking.specialty}</p>
+                <div className="flex flex-col space-y-1 mt-2 text-sm">
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <PhoneIcon className="h-3 w-3" />
+                    <span>{showBooking.phone}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <Mail className="h-3 w-3" />
+                    <span className="truncate">{showBooking.email}</span>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* User Profile Info (Auto-filled, Read-only) */}
+            {isLoadingProfile ? (
+              <div className="mb-6 text-center text-gray-400">Loading profile...</div>
+            ) : userProfile ? (
+              <div className="bg-white bg-opacity-5 rounded-lg p-4 mb-6 space-y-2">
+                <h4 className="text-sm font-semibold text-gray-300 mb-3">Your Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <User className="h-4 w-4" />
+                    <span>{userProfile.fullName || userProfile.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <Mail className="h-4 w-4" />
+                    <span>{userProfile.email}</span>
+                  </div>
+                  {userProfile.phoneNumber && (
+                    <div className="flex items-center space-x-2 text-gray-300">
+                      <PhoneIcon className="h-4 w-4" />
+                      <span>{userProfile.phoneNumber}</span>
+                    </div>
+                  )}
+                  {userProfile.dateOfBirth && (
+                    <div className="flex items-center space-x-2 text-gray-300">
+                      <Calendar className="h-4 w-4" />
+                      <span>{new Date(userProfile.dateOfBirth).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
             
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Consultation Type
+                  Consultation Type *
                 </label>
                 <div className="space-y-2">
                   {showBooking.consultationTypes.map(type => {
@@ -344,7 +490,7 @@ const Consultation: React.FC = () => {
                           name="consultationType"
                           value={type}
                           checked={bookingType === type}
-                          onChange={(e) => setBookingType(e.target.value)}
+                          onChange={(e) => setBookingType(e.target.value as 'video' | 'phone' | 'chat')}
                           className="text-[#6A9FB5] focus:ring-[#6A9FB5]"
                         />
                         <div className="flex items-center space-x-2">
@@ -360,36 +506,61 @@ const Consultation: React.FC = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Preferred Date & Time
+                  Preferred Date *
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
+                  value={preferredDate}
+                  onChange={(e) => setPreferredDate(e.target.value)}
+                  min={getMinDate()}
+                  className="w-full p-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6A9FB5]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Preferred Time *
+                </label>
+                <input
+                  type="time"
+                  value={preferredTime}
+                  onChange={(e) => setPreferredTime(e.target.value)}
                   className="w-full p-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6A9FB5]"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Reason for Consultation
+                  Reason for Consultation *
                 </label>
                 <textarea
-                  rows={3}
-                  placeholder="Briefly describe your symptoms or concerns..."
+                  rows={4}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Briefly describe your symptoms or concerns (minimum 10 characters)..."
                   className="w-full p-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6A9FB5] resize-none"
                 />
+                <p className="text-xs text-gray-400 mt-1">{reason.length}/1000 characters</p>
               </div>
             </div>
             
             <div className="flex space-x-4">
               <button
                 onClick={handleBooking}
-                className="flex-1 bg-[#6A9FB5] hover:bg-[#5A8FA5] text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+                disabled={isSubmitting}
+                className="flex-1 bg-[#6A9FB5] hover:bg-[#5A8FA5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
               >
-                Confirm Booking
+                {isSubmitting ? 'Booking...' : 'Confirm Booking'}
               </button>
               <button
-                onClick={() => setShowBooking(null)}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+                onClick={() => {
+                  setShowBooking(null);
+                  setPreferredDate('');
+                  setPreferredTime('');
+                  setReason('');
+                }}
+                disabled={isSubmitting}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 hover:scale-[1.02]"
               >
                 Cancel
               </button>
