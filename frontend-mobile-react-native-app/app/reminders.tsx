@@ -5,11 +5,6 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
 import { reminderService, Reminder } from '@/services/reminderService';
-import {
-  scheduleRecurringReminderNotifications,
-  cancelReminderNotifications,
-  requestNotificationPermissions,
-} from '@/utils/notificationScheduler';
 
 export default function RemindersScreen() {
   const router = useRouter();
@@ -37,7 +32,6 @@ export default function RemindersScreen() {
   // Load reminders on mount
   useEffect(() => {
     loadReminders();
-    requestNotificationPermissions();
   }, []);
 
   const loadReminders = async () => {
@@ -69,13 +63,6 @@ export default function RemindersScreen() {
         isActive: !reminder.isActive,
       });
 
-      // Cancel or schedule local notifications
-      if (!updatedReminder.reminder.isActive) {
-        await cancelReminderNotifications(reminder.id);
-      } else {
-        await scheduleRecurringReminderNotifications(updatedReminder.reminder);
-      }
-
       await loadReminders();
       Alert.alert('Success', `Reminder ${updatedReminder.reminder.isActive ? 'enabled' : 'disabled'}!`);
     } catch (error: any) {
@@ -94,9 +81,6 @@ export default function RemindersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Cancel local notifications first
-              await cancelReminderNotifications(reminder.id);
-              // Delete from backend
               await reminderService.deleteReminder(reminder.id);
               await loadReminders();
               Alert.alert('Success', 'Reminder deleted successfully!');
@@ -158,18 +142,9 @@ export default function RemindersScreen() {
       let result;
       if (editingReminder) {
         result = await reminderService.updateReminder(editingReminder.id, reminderData);
-        // Cancel old notifications and schedule new ones
-        await cancelReminderNotifications(editingReminder.id);
-        if (result.reminder.isActive) {
-          await scheduleRecurringReminderNotifications(result.reminder);
-        }
         Alert.alert('Success', 'Reminder updated successfully!');
       } else {
         result = await reminderService.createReminder(reminderData);
-        // Schedule local notifications
-        if (result.reminder.isActive) {
-          await scheduleRecurringReminderNotifications(result.reminder);
-        }
         Alert.alert('Success', 'Reminder created successfully!');
       }
 

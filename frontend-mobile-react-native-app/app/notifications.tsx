@@ -1,54 +1,35 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Bell, Clock, Check, CheckCheck, X } from 'lucide-react-native';
+import { ArrowLeft, Bell, Clock, Check, CheckCheck } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState, useEffect } from 'react';
-import { reminderService, Notification } from '@/services/reminderService';
+import { useEffect } from 'react';
+import { useNotifications } from '@/context/NotificationContext';
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { notifications, isLoading, unreadCount, markAsRead, markAllAsRead, refreshNotifications } = useNotifications();
 
+  // Refresh notifications when screen is focused
   useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  const loadNotifications = async () => {
-    try {
-      setIsLoading(true);
-      const result = await reminderService.getNotifications({ limit: 50 });
-      setNotifications(result.notifications);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load notifications');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await reminderService.markAsRead(id);
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, isRead: true } : n)
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to mark notification as read');
+      await markAsRead(id);
+    } catch (error) {
+      // Error already handled in context
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
-      await reminderService.markAllAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      Alert.alert('Success', 'All notifications marked as read');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to mark all as read');
+      await markAllAsRead();
+    } catch (error) {
+      // Error already handled in context
     }
   };
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
     <SafeAreaView style={styles.container}>
