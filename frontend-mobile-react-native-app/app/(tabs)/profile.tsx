@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, TextInput, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Settings, Bell, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Shield, ChevronRight, Save, Mail, Phone, Calendar, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { User, Settings, Bell, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Shield, ChevronRight, Save, Mail, Phone, Calendar, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
@@ -67,24 +67,6 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             await authService.logout();
-            router.replace('/auth');
-          }
-        }
-      ]
-    );
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. All your data will be permanently deleted.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Account Deleted', 'Your account has been deleted.');
             router.replace('/auth');
           }
         }
@@ -467,7 +449,7 @@ export default function ProfileScreen() {
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileData.name || 'User'}</Text>
+              <Text style={styles.profileName}>{profileData.fullName || 'User'}</Text>
               <Text style={styles.profileEmail}>{profileData.email || ''}</Text>
               <Text style={styles.memberSince}>Member since January 2025</Text>
             </View>

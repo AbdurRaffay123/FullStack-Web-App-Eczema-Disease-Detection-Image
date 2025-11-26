@@ -745,4 +745,3 @@ const styles = StyleSheet.create({
   },
 });
 
-});
