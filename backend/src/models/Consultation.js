@@ -69,6 +69,11 @@ const consultationSchema = new mongoose.Schema(
       required: [true, 'Doctor name is required'],
       trim: true,
     },
+    doctorSpecialty: {
+      type: String,
+      required: [true, 'Doctor specialty is required'],
+      trim: true,
+    },
     doctorEmail: {
       type: String,
       required: [true, 'Doctor email is required'],
@@ -78,6 +83,12 @@ const consultationSchema = new mongoose.Schema(
     doctorPhone: {
       type: String,
       trim: true,
+    },
+    // Price Information
+    price: {
+      type: Number,
+      required: [true, 'Consultation price is required'],
+      min: [0, 'Price must be a positive number'],
     },
     // System Fields
     status: {

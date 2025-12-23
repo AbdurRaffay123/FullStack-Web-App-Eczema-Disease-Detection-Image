@@ -21,10 +21,10 @@ const Tips: React.FC = () => {
   // Tips organized by severity level
   const tipsBySeverity = {
     Low: [
-      {
+    {
         id: 'low-1',
-        title: 'Daily Moisturizing Routine',
-        category: 'Skincare',
+      title: 'Daily Moisturizing Routine',
+      category: 'Skincare',
         content: `For mild eczema, maintaining a consistent moisturizing routine is key. Apply a fragrance-free, hypoallergenic moisturizer twice daily - once in the morning and once before bed.
 
 Key points:
@@ -36,12 +36,12 @@ Key points:
 
 Remember: Consistency is more important than the specific product. Find what works and stick with it.`,
         tags: ['moisturizer', 'daily routine', 'prevention'],
-        readTime: '3 min'
-      },
-      {
+      readTime: '3 min'
+    },
+    {
         id: 'low-2',
-        title: 'Gentle Cleansing Practices',
-        category: 'Skincare',
+      title: 'Gentle Cleansing Practices',
+      category: 'Skincare',
         content: `Proper cleansing helps maintain skin health without causing irritation. Use gentle, fragrance-free cleansers designed for sensitive skin.
 
 Best practices:
@@ -53,10 +53,10 @@ Best practices:
 • Consider cleansing oils for dry skin
 
 Avoid: Harsh scrubs, antibacterial soaps, and products with fragrances or essential oils.`,
-        tags: ['cleansing', 'bathing', 'gentle care'],
-        readTime: '3 min'
-      },
-      {
+      tags: ['cleansing', 'bathing', 'gentle care'],
+      readTime: '3 min'
+    },
+    {
         id: 'low-3',
         title: 'Clothing and Fabric Choices',
         category: 'Lifestyle',
@@ -78,7 +78,7 @@ Tip: Layer cotton clothing under wool or synthetic materials if you must wear th
       {
         id: 'low-4',
         title: 'Hydration and Diet Basics',
-        category: 'Diet',
+      category: 'Diet',
         content: `While food doesn't cause eczema, maintaining good hydration and a balanced diet supports overall skin health.
 
 Hydration tips:
@@ -133,8 +133,8 @@ Outdoor protection:
 • Use gentle sunscreen (mineral-based, fragrance-free)
 • Rinse off after swimming (chlorine/salt water)`,
         tags: ['environment', 'prevention', 'home'],
-        readTime: '4 min'
-      }
+      readTime: '4 min'
+    }
     ],
     Moderate: [
       {

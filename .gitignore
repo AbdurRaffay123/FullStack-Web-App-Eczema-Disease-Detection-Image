@@ -50,6 +50,13 @@ nativewind-env.d.ts
 coverage/
 .nyc_output/
 
+# Python virtual environments
+venv/
+**/venv/
+*.pyc
+__pycache__/
+**/__pycache__/
+
 # Misc
 *.local
 .cache/

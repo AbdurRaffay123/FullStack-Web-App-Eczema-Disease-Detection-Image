@@ -4,6 +4,7 @@
  */
 
 import { API_CONFIG, buildApiUrl } from '../config/api';
+import { authService } from '../services/authService';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -21,10 +22,24 @@ export interface RequestOptions {
 }
 
 class ApiClient {
-  private getAuthToken(): string | null {
-    // TODO: Get token from secure storage (e.g., expo-secure-store)
-    // For now, return null - implement when backend is ready
-    return null;
+  private async getAuthToken(): Promise<string | null> {
+    try {
+      return await authService.getToken();
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  private async handleUnauthorized(): Promise<void> {
+    // Clear auth data and redirect to login
+    try {
+      await authService.logout();
+      // Note: Navigation should be handled by the app's routing system
+      // This will be handled by checking authentication state in components
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   }
 
   private async request<T>(
@@ -40,7 +55,7 @@ class ApiClient {
     } = options;
 
     const url = buildApiUrl(endpoint, params);
-    const token = this.getAuthToken();
+    const token = await this.getAuthToken();
 
     const requestHeaders: HeadersInit = {
       ...API_CONFIG.HEADERS,
@@ -66,6 +81,16 @@ class ApiClient {
       clearTimeout(timeoutId);
 
       const responseData = await response.json().catch(() => ({}));
+
+      // Handle 401 Unauthorized - Token expired or invalid
+      if (response.status === 401) {
+        await this.handleUnauthorized();
+        return {
+          status: response.status,
+          error: responseData.message || responseData.error || 'Token expired. Please login again.',
+          data: responseData,
+        };
+      }
 
       if (!response.ok) {
         return {

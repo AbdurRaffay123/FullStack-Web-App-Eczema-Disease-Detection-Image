@@ -201,26 +201,40 @@ const Consultation: React.FC = () => {
         preferredTime: preferredTime,
         reason: reason.trim(),
         doctorName: showBooking.name,
+        doctorSpecialty: showBooking.specialty,
         doctorEmail: showBooking.email,
         doctorPhone: showBooking.phone,
+        price: showBooking.price[bookingType],
       };
 
       await consultationService.createConsultation(bookingData);
-      showToast(`Consultation with ${showBooking.name} booked successfully!`, 'success');
+      showToast(`Consultation with ${showBooking.name} booked successfully! Confirmation emails have been sent.`, 'success');
+      
+      // Reset form
       setShowBooking(null);
       setPreferredDate('');
       setPreferredTime('');
       setReason('');
+      setBookingType('video');
     } catch (error: any) {
       // Handle profile incomplete error
-      if (error.message.includes('PROFILE_INCOMPLETE')) {
+      if (error.message?.includes('PROFILE_INCOMPLETE')) {
         const errorMsg = error.message.replace('PROFILE_INCOMPLETE: ', '');
         showToast(errorMsg, 'error');
         setTimeout(() => {
           navigate('/profile');
         }, 2000);
+      } else if (error.message?.includes('Profile incomplete')) {
+        showToast('Please complete your profile before booking a consultation', 'error');
+        setTimeout(() => {
+          navigate('/profile');
+        }, 2000);
+      } else if (error.message?.includes('validation') || error.message?.includes('required')) {
+        showToast(error.message || 'Please check all required fields', 'error');
+      } else if (error.message?.includes('network') || error.message?.includes('Network')) {
+        showToast('Network error. Please check your connection and try again.', 'error');
       } else {
-        showToast(error.message || 'Failed to book consultation', 'error');
+        showToast(error.message || 'Failed to book consultation. Please try again.', 'error');
       }
     } finally {
       setIsSubmitting(false);

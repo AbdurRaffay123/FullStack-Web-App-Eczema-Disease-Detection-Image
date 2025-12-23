@@ -1,6 +1,7 @@
 const Consultation = require('../models/Consultation');
 const User = require('../models/User');
 const { sendDoctorBookingEmail, sendUserConfirmationEmail } = require('../utils/email.util');
+const logger = require('../utils/logger.util');
 
 /**
  * Check if user profile is complete
@@ -59,7 +60,7 @@ const createConsultation = async (userId, consultationData) => {
   const dateOfBirth = user.dateOfBirth;
 
   // Extract booking data
-  const { consultationType, preferredDate, preferredTime, reason, doctorName, doctorEmail, doctorPhone } = consultationData;
+  const { consultationType, preferredDate, preferredTime, reason, doctorName, doctorSpecialty, doctorEmail, doctorPhone, price } = consultationData;
 
   // Combine date and time
   const preferredDateTime = new Date(preferredDate);
@@ -82,21 +83,67 @@ const createConsultation = async (userId, consultationData) => {
     preferredTime,
     reason: reason.trim(),
     doctorName: doctorName.trim(),
+    doctorSpecialty: doctorSpecialty.trim(),
     doctorEmail: doctorEmail.trim().toLowerCase(),
     doctorPhone: doctorPhone ? doctorPhone.trim() : undefined,
+    price: parseFloat(price),
     status: 'pending',
   });
 
   // Send emails asynchronously (don't block the response)
+  // Booking is saved even if email fails
   Promise.all([
-    sendDoctorBookingEmail(consultation, doctorEmail.trim().toLowerCase(), doctorName.trim()).catch(err => {
-      console.error('Failed to send email to doctor:', err);
+    sendDoctorBookingEmail(
+      consultation, 
+      doctorEmail.trim().toLowerCase(), 
+      doctorName.trim(),
+      doctorSpecialty.trim(),
+      parseFloat(price)
+    ).catch(err => {
+      logger.error('Failed to send email to doctor', {
+        consultationId: consultation._id,
+        doctorEmail: doctorEmail.trim().toLowerCase(),
+        error: err.message,
+        stack: err.stack,
+      });
     }),
-    sendUserConfirmationEmail(consultation, doctorName.trim(), doctorEmail.trim().toLowerCase(), doctorPhone ? doctorPhone.trim() : null).catch(err => {
-      console.error('Failed to send confirmation email to user:', err);
+    sendUserConfirmationEmail(
+      consultation, 
+      doctorName.trim(),
+      doctorSpecialty.trim(),
+      doctorEmail.trim().toLowerCase(), 
+      doctorPhone ? doctorPhone.trim() : null,
+      parseFloat(price)
+    ).catch(err => {
+      logger.error('Failed to send confirmation email to user', {
+        consultationId: consultation._id,
+        userEmail: email,
+        error: err.message,
+        stack: err.stack,
+      });
     }),
-  ]).catch(err => {
-    console.error('Error sending emails:', err);
+  ]).then(results => {
+    const [doctorEmailResult, userEmailResult] = results;
+    if (doctorEmailResult && doctorEmailResult.success) {
+      logger.info('Doctor booking email sent successfully', {
+        consultationId: consultation._id,
+        doctorEmail: doctorEmail.trim().toLowerCase(),
+        messageId: doctorEmailResult.messageId,
+      });
+    }
+    if (userEmailResult && userEmailResult.success) {
+      logger.info('User confirmation email sent successfully', {
+        consultationId: consultation._id,
+        userEmail: email,
+        messageId: userEmailResult.messageId,
+      });
+    }
+  }).catch(err => {
+    logger.error('Error sending emails', {
+      consultationId: consultation._id,
+      error: err.message,
+      stack: err.stack,
+    });
   });
 
   return consultation;

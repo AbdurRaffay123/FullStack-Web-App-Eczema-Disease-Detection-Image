@@ -174,26 +174,37 @@ export default function ConsultScreen() {
 
     setIsSubmitting(true);
     try {
+      // Extract price from consultation fee (remove $ and parse)
+      const priceStr = selectedDoctor.consultationFee.replace('$', '');
+      const price = parseFloat(priceStr) || 0;
+
       const bookingData: CreateConsultationData = {
         consultationType,
         preferredDate: preferredDate, // Already in YYYY-MM-DD format
         preferredTime: preferredTime, // Already in HH:MM format
         reason: reason.trim(),
         doctorName: selectedDoctor.name,
+        doctorSpecialty: selectedDoctor.specialty,
         doctorEmail: selectedDoctor.email,
         doctorPhone: selectedDoctor.phone,
+        price,
       };
 
       await consultationService.createConsultation(bookingData);
       Alert.alert(
         'Success',
-        `Consultation with ${selectedDoctor.name} booked successfully!`,
+        `Consultation with ${selectedDoctor.name} booked successfully! Confirmation emails have been sent to you and the doctor.`,
         [
           {
             text: 'OK',
             onPress: () => {
               setShowBookingModal(false);
               setSelectedDoctor(null);
+              // Reset form
+              setPreferredDate('');
+              setPreferredTime('');
+              setReason('');
+              setConsultationType('video');
             },
           },
         ]
@@ -219,8 +230,30 @@ export default function ConsultScreen() {
             },
           ]
         );
+      } else if (error.message?.includes('Profile incomplete')) {
+        Alert.alert(
+          'Profile Incomplete',
+          'Please complete your profile before booking a consultation',
+          [
+            {
+              text: 'Go to Profile',
+              onPress: () => {
+                setShowBookingModal(false);
+                router.push('/(tabs)/profile');
+              },
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+      } else if (error.message?.includes('validation') || error.message?.includes('required')) {
+        Alert.alert('Validation Error', error.message || 'Please check all required fields');
+      } else if (error.message?.includes('network') || error.message?.includes('Network')) {
+        Alert.alert('Network Error', 'Please check your connection and try again.');
       } else {
-        Alert.alert('Error', error.message || 'Failed to book consultation');
+        Alert.alert('Error', error.message || 'Failed to book consultation. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

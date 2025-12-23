@@ -173,12 +173,20 @@ class ReminderService {
       endpoint += `?${params.toString()}`;
     }
 
-    return this.request<{
-      notifications: Notification[];
-      total: number;
-      limit: number;
-      skip: number;
-    }>(endpoint);
+    try {
+      return await this.request<{
+        notifications: Notification[];
+        total: number;
+        limit: number;
+        skip: number;
+      }>(endpoint);
+    } catch (error: any) {
+      // Handle token expiration specifically
+      if (error.message?.includes('expired') || error.message?.includes('Token expired')) {
+        throw new Error('Token expired');
+      }
+      throw error;
+    }
   }
 
   /**

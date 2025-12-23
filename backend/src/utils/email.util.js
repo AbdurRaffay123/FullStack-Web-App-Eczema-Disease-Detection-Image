@@ -10,23 +10,34 @@ const createTransporter = () => {
     throw new Error('Email configuration is incomplete. Please check EMAIL_HOST, EMAIL_USER, and EMAIL_PASS in .env file');
   }
 
+  // For Gmail, use service configuration
+  if (appConfig.EMAIL_HOST.includes('gmail.com') || appConfig.EMAIL_USER.includes('@gmail.com')) {
+    const config = {
+      service: 'gmail',
+      auth: {
+        user: appConfig.EMAIL_USER,
+        pass: appConfig.EMAIL_PASS.trim(), // Remove any whitespace
+      },
+    };
+    
+    // Verify App Password format (Gmail App Passwords are 16 characters)
+    if (appConfig.EMAIL_PASS.trim().length !== 16 && appConfig.EMAIL_PASS.trim().length !== 20) {
+      console.warn('⚠️  Warning: Gmail App Password should be 16 characters. Make sure you\'re using an App Password, not your regular password.');
+    }
+    
+    return nodemailer.createTransport(config);
+  }
+
+  // For other email providers
   const config = {
     host: appConfig.EMAIL_HOST,
     port: appConfig.EMAIL_PORT,
     secure: appConfig.EMAIL_PORT === 465, // true for 465, false for other ports
     auth: {
       user: appConfig.EMAIL_USER,
-      pass: appConfig.EMAIL_PASS,
+      pass: appConfig.EMAIL_PASS.trim(),
     },
   };
-
-  // For Gmail, add additional options
-  if (appConfig.EMAIL_HOST.includes('gmail.com')) {
-    config.service = 'gmail';
-    // Remove host and port when using service
-    delete config.host;
-    delete config.port;
-  }
 
   return nodemailer.createTransport(config);
 };
@@ -106,7 +117,7 @@ const calculateAge = (dateOfBirth) => {
 /**
  * Send Consultation Booking Email to Doctor
  */
-const sendDoctorBookingEmail = async (consultation, doctorEmail, doctorName) => {
+const sendDoctorBookingEmail = async (consultation, doctorEmail, doctorName, doctorSpecialty, price) => {
   const consultationTypeMap = {
     video: 'Video Consultation',
     phone: 'Phone Consultation',
@@ -223,6 +234,7 @@ CONSULTATION DETAILS:
 - Consultation Type: ${consultationTypeMap[consultation.consultationType] || consultation.consultationType}
 - Preferred Date: ${formatDate(consultation.preferredDate)}
 - Preferred Time: ${formatTime(consultation.preferredTime)}
+- Price: $${price.toFixed(2)}
 - Status: ${consultation.status}
 
 REASON FOR CONSULTATION:
@@ -248,7 +260,7 @@ Please do not reply to this email.
 /**
  * Send Consultation Confirmation Email to User
  */
-const sendUserConfirmationEmail = async (consultation, doctorName, doctorEmail, doctorPhone) => {
+const sendUserConfirmationEmail = async (consultation, doctorName, doctorSpecialty, doctorEmail, doctorPhone, price) => {
   const consultationTypeMap = {
     video: 'Video Consultation',
     phone: 'Phone Consultation',
@@ -291,6 +303,10 @@ const sendUserConfirmationEmail = async (consultation, doctorName, doctorEmail, 
             <div class="info-row">
               <span class="label">Doctor Name:</span>
               <span class="value">${doctorName}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Specialty:</span>
+              <span class="value">${doctorSpecialty}</span>
             </div>
             <div class="info-row">
               <span class="label">Email:</span>
@@ -368,6 +384,7 @@ Your consultation booking has been confirmed!
 
 DOCTOR INFORMATION:
 - Doctor Name: ${doctorName}
+- Specialty: ${doctorSpecialty}
 - Email: ${doctorEmail}
 ${doctorPhone ? `- Phone: ${doctorPhone}` : ''}
 
@@ -375,6 +392,7 @@ CONSULTATION DETAILS:
 - Consultation Type: ${consultationTypeMap[consultation.consultationType] || consultation.consultationType}
 - Preferred Date: ${formatDate(consultation.preferredDate)}
 - Preferred Time: ${formatTime(consultation.preferredTime)}
+- Price: $${price.toFixed(2)}
 - Status: ${consultation.status}
 
 YOUR INFORMATION:

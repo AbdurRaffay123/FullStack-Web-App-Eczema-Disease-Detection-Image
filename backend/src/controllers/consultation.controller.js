@@ -8,7 +8,7 @@ const { successResponse, errorResponse } = require('../utils/response.util');
 const createConsultation = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const { consultationType, preferredDate, preferredTime, reason, doctorName, doctorEmail, doctorPhone } = req.body;
+    const { consultationType, preferredDate, preferredTime, reason, doctorName, doctorSpecialty, doctorEmail, doctorPhone, price } = req.body;
 
     const consultation = await consultationService.createConsultation(userId, {
       consultationType,
@@ -16,8 +16,10 @@ const createConsultation = async (req, res, next) => {
       preferredTime,
       reason,
       doctorName,
+      doctorSpecialty,
       doctorEmail,
       doctorPhone,
+      price,
     });
 
     return successResponse(res, 201, 'Consultation booking created successfully. Confirmation emails have been sent.', {
@@ -32,8 +34,10 @@ const createConsultation = async (req, res, next) => {
         preferredTime: consultation.preferredTime,
         reason: consultation.reason,
         doctorName: consultation.doctorName,
+        doctorSpecialty: consultation.doctorSpecialty,
         doctorEmail: consultation.doctorEmail,
         doctorPhone: consultation.doctorPhone,
+        price: consultation.price,
         status: consultation.status,
         createdAt: consultation.createdAt,
         updatedAt: consultation.updatedAt,
@@ -73,8 +77,10 @@ const getConsultations = async (req, res, next) => {
       preferredTime: consultation.preferredTime,
       reason: consultation.reason,
       doctorName: consultation.doctorName,
+      doctorSpecialty: consultation.doctorSpecialty,
       doctorEmail: consultation.doctorEmail,
       doctorPhone: consultation.doctorPhone,
+      price: consultation.price,
       status: consultation.status,
       createdAt: consultation.createdAt,
       updatedAt: consultation.updatedAt,
@@ -111,8 +117,10 @@ const getConsultationById = async (req, res, next) => {
         preferredTime: consultation.preferredTime,
         reason: consultation.reason,
         doctorName: consultation.doctorName,
+        doctorSpecialty: consultation.doctorSpecialty,
         doctorEmail: consultation.doctorEmail,
         doctorPhone: consultation.doctorPhone,
+        price: consultation.price,
         status: consultation.status,
         createdAt: consultation.createdAt,
         updatedAt: consultation.updatedAt,

@@ -5,6 +5,7 @@
  */
 
 import { API_CONFIG, buildApiUrl } from '../config/api';
+import { authService } from '../services/authService';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -25,6 +26,15 @@ class ApiClient {
   private getAuthToken(): string | null {
     // Get token from localStorage
     return localStorage.getItem('eczema_token');
+  }
+
+  private handleUnauthorized(): void {
+    // Clear auth data and redirect to login
+    authService.logout();
+    // Redirect to login page
+    if (window.location.pathname !== '/auth' && window.location.pathname !== '/login') {
+      window.location.href = '/auth';
+    }
   }
 
   private async request<T>(
@@ -67,6 +77,16 @@ class ApiClient {
       clearTimeout(timeoutId);
 
       const responseData = await response.json().catch(() => ({}));
+
+      // Handle 401 Unauthorized - Token expired or invalid
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        return {
+          status: response.status,
+          error: responseData.message || responseData.error || 'Token expired. Please login again.',
+          data: responseData,
+        };
+      }
 
       if (!response.ok) {
         return {

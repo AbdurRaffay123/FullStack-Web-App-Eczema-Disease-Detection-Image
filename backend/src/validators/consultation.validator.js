@@ -47,10 +47,14 @@ const validateCreateConsultation = (req, res, next) => {
   }
 
   // Validate doctor information
-  const { doctorName, doctorEmail, doctorPhone } = req.body;
+  const { doctorName, doctorSpecialty, doctorEmail, doctorPhone, price } = req.body;
 
   if (!doctorName || typeof doctorName !== 'string' || !doctorName.trim()) {
     return errorResponse(res, 400, 'Doctor name is required');
+  }
+
+  if (!doctorSpecialty || typeof doctorSpecialty !== 'string' || !doctorSpecialty.trim()) {
+    return errorResponse(res, 400, 'Doctor specialty is required');
   }
 
   if (!doctorEmail || typeof doctorEmail !== 'string' || !doctorEmail.trim()) {
@@ -61,6 +65,16 @@ const validateCreateConsultation = (req, res, next) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(doctorEmail)) {
     return errorResponse(res, 400, 'Invalid doctor email format');
+  }
+
+  // Validate price
+  if (price === undefined || price === null) {
+    return errorResponse(res, 400, 'Consultation price is required');
+  }
+
+  const priceNum = parseFloat(price);
+  if (isNaN(priceNum) || priceNum < 0) {
+    return errorResponse(res, 400, 'Price must be a valid positive number');
   }
 
   next();

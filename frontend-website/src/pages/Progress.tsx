@@ -422,43 +422,43 @@ const Progress: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={itchinessData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  />
-                  <YAxis 
-                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                    domain={[0, 10]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(0,0,0,0.8)', 
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: '8px',
-                      color: '#fff'
-                    }}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={itchinessData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                />
+                <YAxis 
+                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                  domain={[0, 10]}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(0,0,0,0.8)', 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
                     labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric',
                       year: 'numeric'
                     })}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="level" 
-                    stroke="#6A9FB5" 
-                    strokeWidth={3}
-                    dot={{ fill: '#6A9FB5', strokeWidth: 2, r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="level" 
+                  stroke="#6A9FB5" 
+                  strokeWidth={3}
+                  dot={{ fill: '#6A9FB5', strokeWidth: 2, r: 4 }}
                     name="Itchiness Level"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
           )}
         </div>
 
@@ -478,31 +478,31 @@ const Progress: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={flareUpData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    tick={{ fill: '#D1D5DB', fontSize: 12 }}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={flareUpData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                />
+                <YAxis 
+                  tick={{ fill: '#D1D5DB', fontSize: 12 }}
                     allowDecimals={false}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(0,0,0,0.8)', 
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: '8px',
-                      color: '#fff'
-                    }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(0,0,0,0.8)', 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
                     formatter={(value: number) => [`${value} day${value !== 1 ? 's' : ''}`, 'Flare-ups']}
-                  />
+                />
                   <Bar dataKey="count" fill="#C5B4E3" radius={[4, 4, 0, 0]} name="Flare-ups" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
           )}
         </div>
       </div>
@@ -523,57 +523,57 @@ const Progress: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={triggerData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={triggerData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
                     label={({ name, value }) => `${name}: ${value}%`}
                     labelLine={false}
-                  >
-                    {triggerData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(0,0,0,0.8)', 
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: '8px',
-                      color: '#fff'
-                    }}
+                >
+                  {triggerData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(0,0,0,0.8)', 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
                     formatter={(value: number, name: string, props: any) => [
                       `${value}% (${props.payload.count} occurrence${props.payload.count !== 1 ? 's' : ''})`,
                       props.payload.name
                     ]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-4">
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white mb-4">Top Triggers</h3>
-              {triggerData.map((trigger, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: trigger.color }}
-                    ></div>
-                    <span className="text-white font-medium">{trigger.name}</span>
-                  </div>
+            {triggerData.map((trigger, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: trigger.color }}
+                  ></div>
+                  <span className="text-white font-medium">{trigger.name}</span>
+                </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-gray-300 text-sm">({trigger.count}x)</span>
                     <span className="text-gray-300 font-semibold">{trigger.value}%</span>
                   </div>
-                </div>
-              ))}
+              </div>
+            ))}
               {filteredLogs.length > 0 && triggerData.length === 0 && (
                 <p className="text-gray-400 text-sm italic">
                   No triggers logged yet. Add triggers when logging symptoms to see analysis.
@@ -638,7 +638,7 @@ const Progress: React.FC = () => {
       {/* Reminder Tracking */}
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-6">
-          <div>
+                <div>
             <h2 className="text-xl font-bold text-white mb-2">Reminder Tracking</h2>
             <p className="text-gray-400 text-sm">Track your reminders over time</p>
           </div>
@@ -715,13 +715,13 @@ const Progress: React.FC = () => {
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-green-500"></div>
                 <span className="text-sm text-gray-300">Active</span>
-              </div>
+                </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-gray-500"></div>
                 <span className="text-sm text-gray-300">Inactive</span>
               </div>
             </div>
-          </div>
+        </div>
         )}
       </div>
     </div>

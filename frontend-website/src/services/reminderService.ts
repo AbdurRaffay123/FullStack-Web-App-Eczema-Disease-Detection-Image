@@ -164,6 +164,11 @@ class ReminderService {
       };
     }>(API_ENDPOINTS.NOTIFICATIONS.LIST, { params });
 
+    // Handle token expiration
+    if (response.status === 401) {
+      throw new Error('Token expired');
+    }
+
     if (response.error || !response.data?.success) {
       throw new Error(response.error || response.data?.message || 'Failed to fetch notifications');
     }

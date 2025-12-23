@@ -11,6 +11,11 @@ export interface Consultation {
   preferredDate: string;
   preferredTime: string;
   reason: string;
+  doctorName: string;
+  doctorSpecialty: string;
+  doctorEmail: string;
+  doctorPhone?: string;
+  price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
@@ -22,8 +27,10 @@ export interface CreateConsultationData {
   preferredTime: string; // HH:MM format
   reason: string;
   doctorName: string;
+  doctorSpecialty: string;
   doctorEmail: string;
   doctorPhone?: string;
+  price: number;
 }
 
 /**
