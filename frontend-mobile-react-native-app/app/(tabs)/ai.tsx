@@ -5,13 +5,14 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { Camera, RotateCcw, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { imageService, ImageAnalysisResult } from '@/services/imageService';
 
 export default function AIScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<ImageAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
@@ -49,24 +50,17 @@ export default function AIScreen() {
     
     setIsAnalyzing(true);
     
-    // Simulate AI analysis
-    setTimeout(() => {
-      const mockResult = {
-        condition: 'Eczema',
-        confidence: 87,
-        severity: 'Moderate',
-        recommendations: [
-          'Apply fragrance-free moisturizer twice daily',
-          'Avoid hot showers and harsh soaps',
-          'Consider seeing a dermatologist for treatment options',
-          'Keep a symptom diary to identify triggers'
-        ],
-        disclaimer: 'This AI analysis is for informational purposes only and should not replace professional medical advice. Please consult with a dermatologist for proper diagnosis and treatment.'
-      };
-      
-      setAnalysisResult(mockResult);
+    try {
+      const result = await imageService.uploadImage(imageUri);
+      setAnalysisResult(result.analysis);
+      Alert.alert('Success', 'Image analyzed successfully!');
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      Alert.alert('Error', error.message || 'Failed to analyze image. Please try again.');
+      setAnalysisResult(null);
+    } finally {
       setIsAnalyzing(false);
-    }, 3000);
+    }
   };
 
   const toggleCameraFacing = () => {
@@ -212,30 +206,52 @@ export default function AIScreen() {
                 <Text style={styles.resultTitle}>Analysis Complete</Text>
               </View>
               
-              <View style={styles.diagnosisCard}>
-                <Text style={styles.diagnosisTitle}>Possible Condition</Text>
-                <Text style={styles.diagnosisCondition}>{analysisResult.condition}</Text>
-                <View style={styles.confidenceContainer}>
-                  <Text style={styles.confidenceLabel}>Confidence: </Text>
-                  <Text style={styles.confidenceValue}>{analysisResult.confidence}%</Text>
+              {!analysisResult.relevant ? (
+                <View style={styles.warningCard}>
+                  <AlertCircle size={24} color="#FFA500" />
+                  <Text style={styles.warningTitle}>Image Not Relevant</Text>
+                  <Text style={styles.warningText}>
+                    {analysisResult.message || analysisResult.explanation || 'The uploaded image does not appear to be human skin.'}
+                  </Text>
                 </View>
-                <Text style={styles.severityText}>Severity: {analysisResult.severity}</Text>
-              </View>
-              
-              <View style={styles.recommendationsCard}>
-                <Text style={styles.recommendationsTitle}>Recommendations</Text>
-                {analysisResult.recommendations.map((rec: string, index: number) => (
-                  <View key={index} style={styles.recommendationItem}>
-                    <Text style={styles.recommendationBullet}>•</Text>
-                    <Text style={styles.recommendationText}>{rec}</Text>
+              ) : (
+                <>
+                  <View style={styles.diagnosisCard}>
+                    <Text style={styles.diagnosisTitle}>Analysis Result</Text>
+                    <Text style={[
+                      styles.diagnosisCondition,
+                      { color: analysisResult.eczema_detected ? '#DC3545' : '#28A745' }
+                    ]}>
+                      {analysisResult.eczema_detected ? 'Eczema Detected' : 'No Eczema Detected'}
+                    </Text>
+                    <View style={styles.confidenceContainer}>
+                      <Text style={styles.confidenceLabel}>Confidence: </Text>
+                      <Text style={styles.confidenceValue}>
+                        {(analysisResult.confidence * 100).toFixed(1)}%
+                      </Text>
+                    </View>
+                    {analysisResult.severity && (
+                      <Text style={styles.severityText}>
+                        Severity: {analysisResult.severity}
+                      </Text>
+                    )}
                   </View>
-                ))}
-              </View>
-              
-              <View style={styles.disclaimerCard}>
-                <AlertCircle size={16} color="#FFA500" />
-                <Text style={styles.disclaimerText}>{analysisResult.disclaimer}</Text>
-              </View>
+                  
+                  {analysisResult.explanation && (
+                    <View style={styles.explanationCard}>
+                      <Text style={styles.explanationTitle}>Explanation</Text>
+                      <Text style={styles.explanationText}>{analysisResult.explanation}</Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.disclaimerCard}>
+                    <AlertCircle size={16} color="#FFA500" />
+                    <Text style={styles.disclaimerText}>
+                      {analysisResult.disclaimer || 'This AI analysis is for informational purposes only and should not replace professional medical advice. Please consult with a dermatologist for proper diagnosis and treatment.'}
+                    </Text>
+                  </View>
+                </>
+              )}
               
               <TouchableOpacity style={styles.newAnalysisButton} onPress={resetAnalysis}>
                 <Text style={styles.newAnalysisButtonText}>Analyze Another Image</Text>
@@ -624,5 +640,48 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
+  },
+  warningCard: {
+    backgroundColor: 'rgba(255, 165, 0, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 165, 0, 0.3)',
+    alignItems: 'center',
+  },
+  warningTitle: {
+    fontSize: 18,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFFFFF',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFA500',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  explanationCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  explanationTitle: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  explanationText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+    lineHeight: 20,
   },
 });

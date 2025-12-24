@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Dashboard from './pages/Dashboard';
 import ImageUpload from './pages/ImageUpload';
+import ImageHistory from './pages/ImageHistory';
 import SymptomLog from './pages/SymptomLog';
 import Tips from './pages/Tips';
 import Reminders from './pages/Reminders';
@@ -36,6 +37,7 @@ function App() {
                       <Routes>
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/upload" element={<ImageUpload />} />
+                        <Route path="/images" element={<ImageHistory />} />
                         <Route path="/log" element={<SymptomLog />} />
                         <Route path="/tips" element={<Tips />} />
                         <Route path="/reminders" element={<Reminders />} />

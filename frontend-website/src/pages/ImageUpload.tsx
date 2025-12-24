@@ -1,16 +1,80 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
-import { Camera, Upload, Loader, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { Camera, Upload, Loader, AlertTriangle, CheckCircle, Info, Stethoscope, Lightbulb } from 'lucide-react';
+import { imageService, ImageAnalysisResult } from '../services/imageService';
 
 const ImageUpload: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<ImageAnalysisResult | null>(null);
+  const [showTips, setShowTips] = useState(false);
   const { showToast } = useToast();
+
+  // Skincare tips based on analysis result
+  const getTips = () => {
+    if (!analysisResult) return [];
+    
+    if (analysisResult.eczema_detected) {
+      const severity = analysisResult.severity?.toLowerCase();
+      const baseTips = [
+        '🧴 Keep your skin moisturized with fragrance-free lotions',
+        '🚿 Take lukewarm showers instead of hot baths',
+        '👕 Wear soft, breathable cotton clothing',
+        '💧 Stay hydrated - drink plenty of water',
+        '🌿 Avoid known triggers like harsh soaps or certain foods',
+        '😴 Ensure you get enough sleep to help skin heal',
+      ];
+      
+      if (severity === 'severe') {
+        return [
+          '⚠️ Consider consulting a dermatologist as soon as possible',
+          '💊 Discuss prescription treatments with your doctor',
+          '🧊 Apply cold compresses to reduce inflammation',
+          ...baseTips,
+        ];
+      } else if (severity === 'moderate') {
+        return [
+          '📅 Schedule a consultation with a dermatologist',
+          '🏥 Over-the-counter hydrocortisone cream may help',
+          ...baseTips,
+        ];
+      } else {
+        return [
+          '✨ Continue with a consistent skincare routine',
+          ...baseTips,
+        ];
+      }
+    } else {
+      return [
+        '✅ Great news! No eczema patterns were detected',
+        '🧴 Continue moisturizing regularly',
+        '☀️ Protect your skin from sun exposure',
+        '💧 Stay hydrated for healthy skin',
+        '🥗 Maintain a balanced diet rich in vitamins',
+        '😌 Manage stress for better skin health',
+      ];
+    }
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select a valid image file', 'error');
+        return;
+      }
+      
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('Image size must be less than 10MB', 'error');
+        return;
+      }
+
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
         setSelectedImage(e.target?.result as string);
@@ -21,46 +85,28 @@ const ImageUpload: React.FC = () => {
   };
 
   const analyzeImage = async () => {
-    if (!selectedImage) return;
+    if (!selectedFile) {
+      showToast('Please select an image first', 'error');
+      return;
+    }
     
     setIsAnalyzing(true);
     
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Mock analysis results
-    const mockResults = [
-      {
-        condition: 'Mild Eczema (Atopic Dermatitis)',
-        confidence: 87,
-        severity: 'Mild',
-        recommendations: [
-          'Apply fragrance-free moisturizer twice daily',
-          'Avoid harsh soaps and detergents',
-          'Consider using a humidifier',
-          'Consult with a dermatologist for treatment options'
-        ]
-      },
-      {
-        condition: 'Contact Dermatitis',
-        confidence: 73,
-        severity: 'Moderate',
-        recommendations: [
-          'Identify and avoid the trigger substance',
-          'Apply cool, wet compresses',
-          'Use topical corticosteroids as prescribed',
-          'Keep the area clean and dry'
-        ]
-      }
-    ];
-    
-    const randomResult = mockResults[Math.floor(Math.random() * mockResults.length)];
-    setAnalysisResult(randomResult);
-    setIsAnalyzing(false);
-    showToast('Analysis complete!', 'success');
+    try {
+      const result = await imageService.uploadImage(selectedFile);
+      setAnalysisResult(result.analysis);
+      showToast('Analysis complete!', 'success');
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      showToast(error.message || 'Failed to analyze image. Please try again.', 'error');
+      setAnalysisResult(null);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity: string | null | undefined) => {
+    if (!severity) return 'text-gray-400';
     switch (severity.toLowerCase()) {
       case 'mild':
         return 'text-green-400';
@@ -71,6 +117,13 @@ const ImageUpload: React.FC = () => {
       default:
         return 'text-gray-400';
     }
+  };
+
+  const resetAnalysis = () => {
+    setSelectedImage(null);
+    setSelectedFile(null);
+    setAnalysisResult(null);
+    setIsAnalyzing(false);
   };
 
   return (
@@ -156,58 +209,114 @@ const ImageUpload: React.FC = () => {
             <h2 className="text-2xl font-bold text-white">Analysis Results</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10">
-              <h3 className="text-lg font-semibold text-white mb-2">Detected Condition</h3>
-              <p className="text-[#6A9FB5] text-xl font-bold mb-2">{analysisResult.condition}</p>
-              <div className="flex items-center space-x-4">
-                <div>
-                  <p className="text-gray-300 text-sm">Confidence</p>
-                  <p className="text-white font-semibold">{analysisResult.confidence}%</p>
-                </div>
-                <div>
-                  <p className="text-gray-300 text-sm">Severity</p>
-                  <p className={`font-semibold ${getSeverityColor(analysisResult.severity)}`}>
-                    {analysisResult.severity}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10">
+          {!analysisResult.relevant ? (
+            <div className="bg-yellow-500 bg-opacity-20 border border-yellow-500 border-opacity-30 rounded-lg p-6 mb-6">
               <div className="flex items-start space-x-3">
-                <AlertTriangle className="h-6 w-6 text-yellow-400 mt-1" />
+                <AlertTriangle className="h-6 w-6 text-yellow-400 mt-1 flex-shrink-0" />
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Important Notice</h3>
-                  <p className="text-gray-300 text-sm">
-                    This AI analysis is for informational purposes only and should not replace professional medical advice. 
-                    Please consult with a qualified dermatologist for proper diagnosis and treatment.
-                  </p>
+                  <h3 className="text-lg font-semibold text-white mb-2">Image Not Relevant</h3>
+                  <p className="text-gray-300">{analysisResult.message || analysisResult.explanation || 'The uploaded image does not appear to be human skin.'}</p>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10">
+                  <h3 className="text-lg font-semibold text-white mb-2">Analysis Result</h3>
+                  <p className={`text-xl font-bold mb-2 ${analysisResult.eczema_detected ? 'text-red-400' : 'text-green-400'}`}>
+                    {analysisResult.eczema_detected ? 'Eczema Detected' : 'No Eczema Detected'}
+                  </p>
+                  <div className="flex items-center space-x-4">
+                    <div>
+                      <p className="text-gray-300 text-sm">Confidence</p>
+                      <p className="text-white font-semibold">{(analysisResult.confidence * 100).toFixed(1)}%</p>
+                    </div>
+                    {analysisResult.severity && (
+                      <div>
+                        <p className="text-gray-300 text-sm">Severity</p>
+                        <p className={`font-semibold ${getSeverityColor(analysisResult.severity)}`}>
+                          {analysisResult.severity}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="h-6 w-6 text-yellow-400 mt-1" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2">Important Notice</h3>
+                      <p className="text-gray-300 text-sm">
+                        {analysisResult.disclaimer || 'This AI analysis is for informational purposes only and should not replace professional medical advice. Please consult with a qualified dermatologist for proper diagnosis and treatment.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {analysisResult.explanation && (
+                <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10 mb-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <Info className="h-6 w-6 text-[#6A9FB5]" />
+                    <h3 className="text-lg font-semibold text-white">Explanation</h3>
+                  </div>
+                  <p className="text-gray-300">{analysisResult.explanation}</p>
+                </div>
+              )}
+            </>
+          )}
           
-          <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10">
-            <div className="flex items-center space-x-3 mb-4">
-              <Info className="h-6 w-6 text-[#6A9FB5]" />
-              <h3 className="text-lg font-semibold text-white">Recommendations</h3>
-            </div>
-            <ul className="space-y-2">
-              {analysisResult.recommendations.map((recommendation: string, index: number) => (
-                <li key={index} className="flex items-start space-x-3">
-                  <div className="h-2 w-2 bg-[#6A9FB5] rounded-full mt-2 flex-shrink-0"></div>
-                  <span className="text-gray-300">{recommendation}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="mt-6 text-center">
-            <button className="bg-[#C5B4E3] hover:bg-[#B5A4D3] text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:scale-[1.02]">
-              Book Consultation
+          {/* Action Buttons */}
+          <div className="mt-6 flex flex-wrap justify-center gap-4">
+            <button 
+              onClick={resetAnalysis}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+            >
+              Analyze Another Image
+            </button>
+            <button 
+              onClick={() => setShowTips(!showTips)}
+              className="flex items-center space-x-2 bg-[#F59E0B] hover:bg-[#D97706] text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+            >
+              <Lightbulb className="h-5 w-5" />
+              <span>{showTips ? 'Hide Tips' : 'Get Tips'}</span>
+            </button>
+            <button 
+              onClick={() => navigate('/consult')}
+              className="flex items-center space-x-2 bg-[#C5B4E3] hover:bg-[#B5A4D3] text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+            >
+              <Stethoscope className="h-5 w-5" />
+              <span>Book Consultation</span>
             </button>
           </div>
+
+          {/* Tips Section */}
+          {showTips && (
+            <div className="mt-6 bg-[#F59E0B] bg-opacity-10 border border-[#F59E0B] border-opacity-30 rounded-lg p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <Lightbulb className="h-6 w-6 text-[#F59E0B]" />
+                <h3 className="text-lg font-semibold text-white">Personalized Tips</h3>
+              </div>
+              <ul className="space-y-3">
+                {getTips().map((tip, index) => (
+                  <li key={index} className="text-gray-300 flex items-start">
+                    <span className="mr-2">{tip}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 pt-4 border-t border-[#F59E0B] border-opacity-30">
+                <button 
+                  onClick={() => navigate('/tips')}
+                  className="text-[#F59E0B] hover:text-[#D97706] font-semibold flex items-center space-x-2"
+                >
+                  <span>View all skincare tips</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

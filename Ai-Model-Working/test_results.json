@@ -1,0 +1,107 @@
+{
+  "test_timestamp": "2025-12-24T01:35:07.569683",
+  "api_url": "http://localhost:8000",
+  "health_check": {
+    "status": "success",
+    "status_code": 200,
+    "data": {
+      "status": "healthy",
+      "service": "eczema-detection-ai",
+      "model_loaded": true,
+      "model_path": "models/eczema_detector_efficientnet.h5",
+      "model_exists": true
+    }
+  },
+  "image_tests": [
+    {
+      "image": "eczema-1.jpeg",
+      "status_code": 200,
+      "timestamp": "2025-12-24T01:35:09.744108",
+      "status": "success",
+      "analysis": {
+        "relevant": true,
+        "eczema_detected": false,
+        "confidence": 0.65,
+        "severity": null,
+        "explanation": "The AI analysis shows a low probability (34%) of eczema patterns. The image does not show strong indicators of eczema. This is an AI assessment, not a medical diagnosis.",
+        "message": "No strong eczema patterns detected in the image.",
+        "disclaimer": "This is an AI-based assessment and not a medical diagnosis."
+      }
+    },
+    {
+      "image": "eczema-2.jpg",
+      "status_code": 200,
+      "timestamp": "2025-12-24T01:35:09.873648",
+      "status": "success",
+      "analysis": {
+        "relevant": true,
+        "eczema_detected": false,
+        "confidence": 0.65,
+        "severity": null,
+        "explanation": "The AI analysis shows a low probability (34%) of eczema patterns. The image does not show strong indicators of eczema. This is an AI assessment, not a medical diagnosis.",
+        "message": "No strong eczema patterns detected in the image.",
+        "disclaimer": "This is an AI-based assessment and not a medical diagnosis."
+      }
+    },
+    {
+      "image": "eczema-3.jpeg",
+      "status_code": 200,
+      "timestamp": "2025-12-24T01:35:10.011454",
+      "status": "success",
+      "analysis": {
+        "relevant": true,
+        "eczema_detected": false,
+        "confidence": 0.65,
+        "severity": null,
+        "explanation": "The AI analysis shows a low probability (34%) of eczema patterns. The image does not show strong indicators of eczema. This is an AI assessment, not a medical diagnosis.",
+        "message": "No strong eczema patterns detected in the image.",
+        "disclaimer": "This is an AI-based assessment and not a medical diagnosis."
+      }
+    },
+    {
+      "image": "eczema-4.jpeg",
+      "status_code": 200,
+      "timestamp": "2025-12-24T01:35:10.137382",
+      "status": "success",
+      "analysis": {
+        "relevant": true,
+        "eczema_detected": false,
+        "confidence": 0.65,
+        "severity": null,
+        "explanation": "The AI analysis shows a low probability (34%) of eczema patterns. The image does not show strong indicators of eczema. This is an AI assessment, not a medical diagnosis.",
+        "message": "No strong eczema patterns detected in the image.",
+        "disclaimer": "This is an AI-based assessment and not a medical diagnosis."
+      }
+    },
+    {
+      "image": "eczema-5.jpg",
+      "status_code": 200,
+      "timestamp": "2025-12-24T01:35:10.261502",
+      "status": "success",
+      "analysis": {
+        "relevant": true,
+        "eczema_detected": false,
+        "confidence": 0.66,
+        "severity": null,
+        "explanation": "The AI analysis shows a low probability (34%) of eczema patterns. The image does not show strong indicators of eczema. This is an AI assessment, not a medical diagnosis.",
+        "message": "No strong eczema patterns detected in the image.",
+        "disclaimer": "This is an AI-based assessment and not a medical diagnosis."
+      }
+    },
+    {
+      "image": "eczema.jpg",
+      "status_code": 200,
+      "timestamp": "2025-12-24T01:35:10.388094",
+      "status": "success",
+      "analysis": {
+        "relevant": true,
+        "eczema_detected": false,
+        "confidence": 0.65,
+        "severity": null,
+        "explanation": "The AI analysis shows a low probability (34%) of eczema patterns. The image does not show strong indicators of eczema. This is an AI assessment, not a medical diagnosis.",
+        "message": "No strong eczema patterns detected in the image.",
+        "disclaimer": "This is an AI-based assessment and not a medical diagnosis."
+      }
+    }
+  ]
+}
