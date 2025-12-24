@@ -66,9 +66,9 @@ export default function ProfileScreen() {
       'Are you sure you want to logout?',
       'Logout',
       async () => {
-        await authService.logout();
-        router.replace('/auth');
-      }
+            await authService.logout();
+            router.replace('/auth');
+          }
     );
   };
 

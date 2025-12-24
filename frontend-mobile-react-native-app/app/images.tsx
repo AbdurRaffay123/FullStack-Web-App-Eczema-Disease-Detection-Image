@@ -44,17 +44,17 @@ export default function ImagesScreen() {
       'Are you sure you want to delete this image?',
       'Delete Image',
       async () => {
-        try {
-          setDeletingId(imageId);
-          await imageService.deleteImage(imageId);
-          setImages(images.filter(img => img._id !== imageId));
+            try {
+              setDeletingId(imageId);
+              await imageService.deleteImage(imageId);
+              setImages(images.filter(img => img._id !== imageId));
           showSuccess('Image deleted successfully');
-        } catch (error: any) {
-          console.error('Error deleting image:', error);
+            } catch (error: any) {
+              console.error('Error deleting image:', error);
           showError(error.message || 'Failed to delete image');
-        } finally {
-          setDeletingId(null);
-        }
+            } finally {
+              setDeletingId(null);
+            }
       }
     );
   };

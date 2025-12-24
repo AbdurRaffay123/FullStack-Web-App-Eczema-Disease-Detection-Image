@@ -78,13 +78,13 @@ export default function RemindersScreen() {
       'Are you sure you want to delete this reminder?',
       'Delete Reminder',
       async () => {
-        try {
-          await reminderService.deleteReminder(reminder.id);
-          await loadReminders();
+            try {
+              await reminderService.deleteReminder(reminder.id);
+              await loadReminders();
           showSuccess('Reminder deleted successfully!');
-        } catch (error: any) {
+            } catch (error: any) {
           showError(error.message || 'Failed to delete reminder');
-        }
+            }
       }
     );
   };

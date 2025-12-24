@@ -52,7 +52,7 @@ export default function ConsultScreen() {
       consultationFee: '$150',
       languages: ['English', 'Urdu'],
       phone: '+92 300 1234567',
-      email: 'dr.junaid@healthcare.com',
+      email: 'abdurraffaykhan0732@gmail.com',
     },
     {
       id: 2,
@@ -296,21 +296,25 @@ export default function ConsultScreen() {
                   </View>
 
                   <View style={styles.doctorDetails}>
-                    <View style={styles.detailItem}>
-                      <MapPin size={14} color="#B0B0B0" />
-                      <Text style={styles.detailText}>{doctor.location}</Text>
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailItem}>
+                        <MapPin size={14} color="#B0B0B0" />
+                        <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">{doctor.location}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Calendar size={14} color="#28A745" />
+                        <Text style={[styles.detailText, { color: '#28A745' }]} numberOfLines={1} ellipsizeMode="tail">{doctor.availability}</Text>
+                      </View>
                     </View>
-                    <View style={styles.detailItem}>
-                      <Calendar size={14} color="#28A745" />
-                      <Text style={[styles.detailText, { color: '#28A745' }]}>{doctor.availability}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Phone size={14} color="#6A9FB5" />
-                      <Text style={styles.detailText}>{doctor.phone}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Mail size={14} color="#6A9FB5" />
-                      <Text style={styles.detailText} numberOfLines={1}>{doctor.email}</Text>
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailItem}>
+                        <Phone size={14} color="#6A9FB5" />
+                        <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">{doctor.phone}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Mail size={14} color="#6A9FB5" />
+                        <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">{doctor.email}</Text>
+                      </View>
                     </View>
                   </View>
 
@@ -637,6 +641,12 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 0,
   },
+  sectionTitle: {
+    fontSize: 20,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
   doctorCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 12,
@@ -644,6 +654,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    width: '100%',
+    overflow: 'hidden',
   },
   doctorImage: {
     width: 80,
@@ -654,23 +666,28 @@ const styles = StyleSheet.create({
   },
   doctorInfo: {
     alignItems: 'center',
+    width: '100%',
   },
   doctorName: {
     fontSize: 18,
     fontFamily: 'OpenSans-Bold',
     color: '#FFFFFF',
     marginBottom: 4,
+    textAlign: 'center',
   },
   doctorSpecialty: {
     fontSize: 14,
     fontFamily: 'OpenSans-Regular',
     color: '#6A9FB5',
     marginBottom: 12,
+    textAlign: 'center',
   },
   doctorStats: {
     flexDirection: 'row',
     gap: 16,
     marginBottom: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   statItem: {
     flexDirection: 'row',
@@ -683,19 +700,32 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   doctorDetails: {
-    flexDirection: 'row',
-    gap: 16,
+    flexDirection: 'column',
+    gap: 6,
     marginBottom: 12,
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    width: '100%',
+    marginBottom: 4,
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flex: 1,
+    minWidth: 0,
   },
   detailText: {
     fontSize: 12,
     fontFamily: 'OpenSans-Regular',
     color: '#B0B0B0',
+    flex: 1,
+    flexShrink: 1,
   },
   languagesContainer: {
     flexDirection: 'row',

@@ -65,12 +65,12 @@ export default function AuthScreen() {
         // Sign up
         await authService.signup({ name, email, password });
         showSuccess('Account created successfully!', 'Success', () => {
-          setIsLogin(true);
-          setEmail('');
-          setPassword('');
-          setConfirmPassword('');
-          setName('');
-          setErrors({});
+            setIsLogin(true);
+            setEmail('');
+            setPassword('');
+            setConfirmPassword('');
+            setName('');
+            setErrors({});
         });
       }
     } catch (error: any) {

@@ -245,8 +245,12 @@ export default function AIScreen() {
           </View>
         )}
 
-        {analysisResult && (
-          <View style={styles.resultContainer}>
+        {analysisResult && capturedImage && (
+          <ScrollView 
+            style={styles.resultContainer}
+            contentContainerStyle={styles.resultContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
             <Image source={{ uri: capturedImage }} style={styles.resultImage} />
             
             <View style={styles.resultContent}>
@@ -345,7 +349,7 @@ export default function AIScreen() {
                 <Text style={styles.newAnalysisButtonText}>Analyze Another Image</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         )}
       </LinearGradient>
     </SafeAreaView>
@@ -590,7 +594,10 @@ const styles = StyleSheet.create({
   },
   resultContainer: {
     flex: 1,
+  },
+  resultContentContainer: {
     padding: 24,
+    paddingBottom: 40,
   },
   resultImage: {
     width: '100%',
@@ -599,7 +606,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   resultContent: {
-    flex: 1,
+    width: '100%',
   },
   resultHeader: {
     flexDirection: 'row',
