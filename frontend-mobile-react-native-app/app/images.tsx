@@ -1,12 +1,15 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Trash2, Image as ImageIcon, Calendar, AlertCircle, CheckCircle, XCircle, Loader } from 'lucide-react-native';
 import { imageService, Image as ImageType } from '@/services/imageService';
 import { useRouter } from 'expo-router';
+import AppHeader from '@/components/AppHeader';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function ImagesScreen() {
+  const { showSuccess, showError, showConfirm } = useModalHelpers();
   const [images, setImages] = useState<ImageType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,7 +27,7 @@ export default function ImagesScreen() {
       setImages(userImages);
     } catch (error: any) {
       console.error('Error loading images:', error);
-      Alert.alert('Error', error.message || 'Failed to load images');
+      showError(error.message || 'Failed to load images');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -37,29 +40,22 @@ export default function ImagesScreen() {
   };
 
   const handleDelete = async (imageId: string) => {
-    Alert.alert(
-      'Delete Image',
+    showConfirm(
       'Are you sure you want to delete this image?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setDeletingId(imageId);
-              await imageService.deleteImage(imageId);
-              setImages(images.filter(img => img._id !== imageId));
-              Alert.alert('Success', 'Image deleted successfully');
-            } catch (error: any) {
-              console.error('Error deleting image:', error);
-              Alert.alert('Error', error.message || 'Failed to delete image');
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ]
+      'Delete Image',
+      async () => {
+        try {
+          setDeletingId(imageId);
+          await imageService.deleteImage(imageId);
+          setImages(images.filter(img => img._id !== imageId));
+          showSuccess('Image deleted successfully');
+        } catch (error: any) {
+          console.error('Error deleting image:', error);
+          showError(error.message || 'Failed to delete image');
+        } finally {
+          setDeletingId(null);
+        }
+      }
     );
   };
 
@@ -108,10 +104,7 @@ export default function ImagesScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Image History</Text>
-          <Text style={styles.subtitle}>View all your uploaded images</Text>
-        </View>
+        <AppHeader title="Image History" showBack showMenu={false} />
 
         <ScrollView
           style={styles.scrollView}

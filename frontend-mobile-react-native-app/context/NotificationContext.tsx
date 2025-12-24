@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { Alert } from 'react-native';
 import { reminderService, Notification } from '../services/reminderService';
 import { authService } from '../services/authService';
+import { useModal } from './ModalContext';
 
 const POLLING_INTERVAL = 10000; // 10 seconds for faster real-time notifications
 
@@ -27,6 +27,7 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { showModal } = useModal();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
@@ -120,14 +121,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         // Add to processed set
         newNotifications.forEach(n => processedIdsRef.current.add(n.id));
 
-        // Show alert for each new notification with a slight delay between them
+        // Show modal for each new notification with a slight delay between them
         newNotifications.forEach((notification, index) => {
           setTimeout(() => {
-            Alert.alert(
+            showModal(
+              'info',
               notification.title,
               notification.message || `Reminder: ${notification.title}`,
-              [{ text: 'OK' }],
-              { cancelable: true }
+              [{ text: 'OK', onPress: () => {} }]
             );
           }, index * 500); // Stagger by 500ms
         });
@@ -158,7 +159,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         prev.map(n => n.id === id ? { ...n, isRead: true } : n)
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to mark notification as read');
+      showModal('error', 'Error', error.message || 'Failed to mark notification as read');
       throw error;
     }
   }, []);
@@ -172,9 +173,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       // Update state immediately
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      Alert.alert('Success', 'All notifications marked as read');
+      showModal('success', 'Success', 'All notifications marked as read');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to mark all as read');
+      showModal('error', 'Error', error.message || 'Failed to mark all as read');
       throw error;
     }
   }, []);

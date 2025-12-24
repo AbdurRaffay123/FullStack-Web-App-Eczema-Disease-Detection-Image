@@ -51,7 +51,8 @@ class ImageService {
 
     // Get token
     const token = await SecureStore.getItemAsync('eczema_token');
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+    // Use the same base URL as API_CONFIG (without /api suffix)
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.18.224:3000';
     const url = `${baseUrl}/api${API_ENDPOINTS.IMAGES.UPLOAD}`;
 
     const headers: HeadersInit = {
@@ -145,7 +146,7 @@ class ImageService {
   getImageUrl(path: string): string {
     // Extract filename from path
     const filename = path.split('/').pop() || path;
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.18.224:3000';
     return `${baseUrl}/uploads/${filename}`;
   }
 }

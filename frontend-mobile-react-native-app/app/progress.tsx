@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Bell, BarChart3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -6,11 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect, useMemo } from 'react';
 import { symptomService, SymptomLog } from '@/services/symptomService';
 import { reminderService, Reminder } from '@/services/reminderService';
+import AppHeader from '@/components/AppHeader';
+import { useModalHelpers } from '@/context/ModalContext';
 
 const { width } = Dimensions.get('window');
 
 export default function ProgressScreen() {
   const router = useRouter();
+  const { showError } = useModalHelpers();
   const [selectedPeriod, setSelectedPeriod] = useState('30');
   const [logs, setLogs] = useState<SymptomLog[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -37,7 +40,7 @@ export default function ProgressScreen() {
       const result = await symptomService.getLogs();
       setLogs(result.logs);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load symptom logs');
+      showError(error.message || 'Failed to load symptom logs');
     } finally {
       setIsLoading(false);
     }
@@ -352,13 +355,7 @@ export default function ProgressScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Progress Tracking</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AppHeader title="Progress Tracking" showBack showMenu={false} />
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.periodSelector}>

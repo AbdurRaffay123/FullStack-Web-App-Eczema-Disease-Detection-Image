@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, TextInput, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Settings, Bell, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Shield, ChevronRight, Save, Mail, Phone, Calendar, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -6,9 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
+import AppHeader from '@/components/AppHeader';
+import { useDrawer } from '@/context/DrawerContext';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { openDrawer } = useDrawer();
+  const { showSuccess, showError, showConfirm } = useModalHelpers();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -47,7 +52,7 @@ export default function ProfileScreen() {
           dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
         });
       } catch (error: any) {
-        Alert.alert('Error', error.message || 'Failed to load profile');
+        showError(error.message || 'Failed to load profile');
       } finally {
         setIsLoadingProfile(false);
       }
@@ -57,20 +62,13 @@ export default function ProfileScreen() {
   // Removed: notifications, dataSharing, analytics, locationTracking, twoFactorAuth
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
+    showConfirm(
       'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => {
-            await authService.logout();
-            router.replace('/auth');
-          }
-        }
-      ]
+      'Logout',
+      async () => {
+        await authService.logout();
+        router.replace('/auth');
+      }
     );
   };
 
@@ -89,26 +87,26 @@ export default function ProfileScreen() {
         dateOfBirth: result.user.dateOfBirth ? new Date(result.user.dateOfBirth).toISOString().split('T')[0] : '',
       });
 
-      Alert.alert('Success', 'Profile updated successfully!');
+      showSuccess('Profile updated successfully!');
       setActiveSection(null);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      showError(error.message || 'Failed to update profile');
     }
   };
 
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      showError('New passwords do not match');
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showError('Password must be at least 6 characters');
       return;
     }
 
     if (!passwordData.currentPassword) {
-      Alert.alert('Error', 'Current password is required');
+      showError('Current password is required');
       return;
     }
 
@@ -120,9 +118,9 @@ export default function ProfileScreen() {
 
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordForm(false);
-      Alert.alert('Success', 'Password changed successfully!');
+      showSuccess('Password changed successfully!');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update password');
+      showError(error.message || 'Failed to update password');
     }
   };
 
@@ -430,10 +428,8 @@ export default function ProfileScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
+        <AppHeader title="Profile" onMenuPress={openDrawer} />
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Profile</Text>
-          </View>
 
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>

@@ -1,12 +1,17 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Plus, Calendar, MapPin, Edit, Trash2, X, AlertCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import { symptomService, SymptomLog as SymptomLogType } from '../../services/symptomService';
+import AppHeader from '@/components/AppHeader';
+import { useDrawer } from '@/context/DrawerContext';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function LogsScreen() {
+  const { openDrawer } = useDrawer();
+  const { showSuccess, showError } = useModalHelpers();
   const [showLogForm, setShowLogForm] = useState(false);
   const [logs, setLogs] = useState<SymptomLogType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +39,7 @@ export default function LogsScreen() {
       const result = await symptomService.getLogs();
       setLogs(result.logs);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load logs');
+      showError(error.message || 'Failed to load logs');
     } finally {
       setIsLoading(false);
     }
@@ -42,12 +47,12 @@ export default function LogsScreen() {
 
   const saveLog = async () => {
     if (!formData.affectedArea) {
-      Alert.alert('Error', 'Please select an affected area');
+      showError('Please select an affected area');
       return;
     }
 
     if (formData.itchinessLevel < 1 || formData.itchinessLevel > 10) {
-      Alert.alert('Error', 'Itchiness level must be between 1 and 10');
+      showError('Itchiness level must be between 1 and 10');
       return;
     }
 
@@ -55,17 +60,17 @@ export default function LogsScreen() {
     try {
       if (editingId) {
         await symptomService.updateLog(editingId, formData);
-        Alert.alert('Success', 'Log updated successfully!');
+        showSuccess('Log updated successfully!');
         setEditingId(null);
       } else {
         await symptomService.createLog(formData);
-        Alert.alert('Success', 'Log saved successfully!');
+        showSuccess('Log saved successfully!');
       }
       
       resetForm();
       loadLogs();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save log');
+      showError(error.message || 'Failed to save log');
     } finally {
       setIsSubmitting(false);
     }
@@ -205,23 +210,24 @@ export default function LogsScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Symptom Logs</Text>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => {
-              if (showLogForm) {
-                resetForm();
-              } else {
-                setShowLogForm(true);
-              }
-            }}
-          >
-            {showLogForm ? <X size={24} color="#FFFFFF" /> : <Plus size={24} color="#FFFFFF" />}
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Symptom Logs" onMenuPress={openDrawer} />
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.addButtonContainer}>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => {
+                if (showLogForm) {
+                  resetForm();
+                } else {
+                  setShowLogForm(true);
+                }
+              }}
+            >
+              {showLogForm ? <X size={24} color="#FFFFFF" /> : <Plus size={24} color="#FFFFFF" />}
+              <Text style={styles.addButtonText}>{showLogForm ? 'Cancel' : 'Add New Log'}</Text>
+            </TouchableOpacity>
+          </View>
           {showLogForm && (
             <View style={styles.logForm}>
               <Text style={styles.formTitle}>
@@ -418,27 +424,18 @@ const styles = StyleSheet.create({
   backgroundGradient: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'OpenSans-Bold',
-    color: '#FFFFFF',
+  addButtonContainer: {
+    padding: 16,
+    paddingBottom: 0,
   },
   addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#6A9FB5',
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6A9FB5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
     shadowColor: '#6A9FB5',
     shadowOffset: {
       width: 0,
@@ -447,6 +444,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
   },
   scrollView: {
     flex: 1,

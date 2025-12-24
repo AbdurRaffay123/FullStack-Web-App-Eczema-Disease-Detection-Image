@@ -1,13 +1,15 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authService } from '../services/authService';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { showSuccess, showError } = useModalHelpers();
   const [isLogin, setIsLogin] = useState(false); // Start with sign up
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,25 +58,23 @@ export default function AuthScreen() {
       if (isLogin) {
         // Login
         await authService.login({ email, password });
-        Alert.alert('Success', 'Login successful!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
+        showSuccess('Login successful!', 'Success', () => {
+          router.replace('/(tabs)');
+        });
       } else {
         // Sign up
         await authService.signup({ name, email, password });
-        Alert.alert('Success', 'Account created successfully!', [
-          { text: 'OK', onPress: () => {
-            setIsLogin(true);
-            setEmail('');
-            setPassword('');
-            setConfirmPassword('');
-            setName('');
-            setErrors({});
-          }}
-        ]);
+        showSuccess('Account created successfully!', 'Success', () => {
+          setIsLogin(true);
+          setEmail('');
+          setPassword('');
+          setConfirmPassword('');
+          setName('');
+          setErrors({});
+        });
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Authentication failed. Please try again.');
+      showError(error.message || 'Authentication failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -1,20 +1,74 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { Camera, RotateCcw, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Camera, RotateCcw, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Lightbulb, Stethoscope, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { imageService, ImageAnalysisResult } from '@/services/imageService';
+import AppHeader from '@/components/AppHeader';
+import { useDrawer } from '@/context/DrawerContext';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function AIScreen() {
+  const router = useRouter();
+  const { openDrawer } = useDrawer();
+  const { showSuccess, showError } = useModalHelpers();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<ImageAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showTips, setShowTips] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  // Get personalized tips based on analysis result
+  const getTips = () => {
+    if (!analysisResult) return [];
+    
+    if (analysisResult.eczema_detected) {
+      const severity = analysisResult.severity?.toLowerCase();
+      const baseTips = [
+        '🧴 Keep your skin moisturized with fragrance-free lotions',
+        '🚿 Take lukewarm showers instead of hot baths',
+        '👕 Wear soft, breathable cotton clothing',
+        '💧 Stay hydrated - drink plenty of water',
+        '🌿 Avoid known triggers like harsh soaps',
+        '😴 Get enough sleep to help skin heal',
+      ];
+      
+      if (severity === 'severe') {
+        return [
+          '⚠️ Consider consulting a dermatologist soon',
+          '💊 Discuss prescription treatments with doctor',
+          '🧊 Apply cold compresses to reduce inflammation',
+          ...baseTips,
+        ];
+      } else if (severity === 'moderate') {
+        return [
+          '📅 Schedule a consultation with a dermatologist',
+          '🏥 Over-the-counter hydrocortisone may help',
+          ...baseTips,
+        ];
+      } else {
+        return [
+          '✨ Continue with a consistent skincare routine',
+          ...baseTips,
+        ];
+      }
+    } else {
+      return [
+        '✅ Great news! No eczema patterns detected',
+        '🧴 Continue moisturizing regularly',
+        '☀️ Protect your skin from sun exposure',
+        '💧 Stay hydrated for healthy skin',
+        '🥗 Maintain a balanced diet',
+        '😌 Manage stress for better skin health',
+      ];
+    }
+  };
 
   const takePicture = async () => {
     if (cameraRef.current) {
@@ -26,7 +80,7 @@ export default function AIScreen() {
         setShowCamera(false);
         analyzeImage(photo?.uri);
       } catch (error) {
-        Alert.alert('Error', 'Failed to take picture');
+        showError('Failed to take picture');
       }
     }
   };
@@ -53,10 +107,10 @@ export default function AIScreen() {
     try {
       const result = await imageService.uploadImage(imageUri);
       setAnalysisResult(result.analysis);
-      Alert.alert('Success', 'Image analyzed successfully!');
+      showSuccess('Image analyzed successfully!');
     } catch (error: any) {
       console.error('Analysis error:', error);
-      Alert.alert('Error', error.message || 'Failed to analyze image. Please try again.');
+      showError(error.message || 'Failed to analyze image. Please try again.');
       setAnalysisResult(null);
     } finally {
       setIsAnalyzing(false);
@@ -140,12 +194,7 @@ export default function AIScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>AI Skin Analysis</Text>
-          <Text style={styles.subtitle}>
-            Get instant insights about your skin condition
-          </Text>
-        </View>
+        <AppHeader title="AI Skin Analysis" onMenuPress={openDrawer} />
 
         {!capturedImage && !analysisResult && (
           <View style={styles.uploadContainer}>
@@ -253,6 +302,45 @@ export default function AIScreen() {
                 </>
               )}
               
+              {/* Action Buttons */}
+              <View style={styles.actionButtonsContainer}>
+                <TouchableOpacity 
+                  style={styles.tipsButton} 
+                  onPress={() => setShowTips(!showTips)}
+                >
+                  <Lightbulb size={18} color="#FFFFFF" />
+                  <Text style={styles.tipsButtonText}>{showTips ? 'Hide Tips' : 'Get Tips'}</Text>
+                  {showTips ? <ChevronUp size={18} color="#FFFFFF" /> : <ChevronDown size={18} color="#FFFFFF" />}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.consultButton} 
+                  onPress={() => router.push('/consult')}
+                >
+                  <Stethoscope size={18} color="#FFFFFF" />
+                  <Text style={styles.consultButtonText}>Book Consultation</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Tips Section */}
+              {showTips && (
+                <View style={styles.tipsContainer}>
+                  <View style={styles.tipsHeader}>
+                    <Lightbulb size={20} color="#FFA500" />
+                    <Text style={styles.tipsTitle}>Personalized Tips</Text>
+                  </View>
+                  {getTips().map((tip, index) => (
+                    <Text key={index} style={styles.tipItem}>{tip}</Text>
+                  ))}
+                  <TouchableOpacity 
+                    style={styles.viewAllTipsButton}
+                    onPress={() => router.push('/tips')}
+                  >
+                    <Text style={styles.viewAllTipsText}>View all skincare tips →</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <TouchableOpacity style={styles.newAnalysisButton} onPress={resetAnalysis}>
                 <Text style={styles.newAnalysisButtonText}>Analyze Another Image</Text>
               </TouchableOpacity>
@@ -621,6 +709,78 @@ const styles = StyleSheet.create({
     color: '#FFA500',
     marginLeft: 8,
     lineHeight: 16,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  tipsButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFA500',
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  tipsButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  consultButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C5B4E3',
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  consultButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+  },
+  tipsContainer: {
+    backgroundColor: 'rgba(255, 165, 0, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 165, 0, 0.3)',
+  },
+  tipsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  tipsTitle: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+  },
+  tipItem: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  viewAllTipsButton: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 165, 0, 0.3)',
+  },
+  viewAllTipsText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFA500',
   },
   newAnalysisButton: {
     backgroundColor: '#6A9FB5',

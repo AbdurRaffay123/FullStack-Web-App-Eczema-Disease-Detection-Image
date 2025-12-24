@@ -1,13 +1,16 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Switch, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Switch, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Plus, Bell, Clock, Trash2, CreditCard as Edit3, Pill, Droplets, Sun, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
 import { reminderService, Reminder } from '@/services/reminderService';
+import AppHeader from '@/components/AppHeader';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function RemindersScreen() {
   const router = useRouter();
+  const { showSuccess, showError, showConfirm } = useModalHelpers();
   const [showAddForm, setShowAddForm] = useState(false);
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderTime, setReminderTime] = useState('09:00');
@@ -40,7 +43,7 @@ export default function RemindersScreen() {
       const result = await reminderService.getReminders();
       setReminders(result.reminders);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load reminders');
+      showError(error.message || 'Failed to load reminders');
     } finally {
       setIsLoading(false);
     }
@@ -64,32 +67,25 @@ export default function RemindersScreen() {
       });
 
       await loadReminders();
-      Alert.alert('Success', `Reminder ${updatedReminder.reminder.isActive ? 'enabled' : 'disabled'}!`);
+      showSuccess(`Reminder ${updatedReminder.reminder.isActive ? 'enabled' : 'disabled'}!`);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update reminder');
+      showError(error.message || 'Failed to update reminder');
     }
   };
 
   const deleteReminder = (reminder: Reminder) => {
-    Alert.alert(
-      'Delete Reminder',
+    showConfirm(
       'Are you sure you want to delete this reminder?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await reminderService.deleteReminder(reminder.id);
-              await loadReminders();
-              Alert.alert('Success', 'Reminder deleted successfully!');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete reminder');
-            }
-          },
-        },
-      ]
+      'Delete Reminder',
+      async () => {
+        try {
+          await reminderService.deleteReminder(reminder.id);
+          await loadReminders();
+          showSuccess('Reminder deleted successfully!');
+        } catch (error: any) {
+          showError(error.message || 'Failed to delete reminder');
+        }
+      }
     );
   };
 
@@ -109,17 +105,17 @@ export default function RemindersScreen() {
 
   const addReminder = async () => {
     if (!reminderTitle.trim()) {
-      Alert.alert('Error', 'Please enter a reminder title');
+      showError('Please enter a reminder title');
       return;
     }
 
     if (reminderMode === 'recurring' && reminderDays.length === 0) {
-      Alert.alert('Error', 'Please select at least one day for recurring reminders');
+      showError('Please select at least one day for recurring reminders');
       return;
     }
 
     if (reminderMode === 'one-time' && !reminderDate) {
-      Alert.alert('Error', 'Please select a date for one-time reminders');
+      showError('Please select a date for one-time reminders');
       return;
     }
 
@@ -142,16 +138,16 @@ export default function RemindersScreen() {
       let result;
       if (editingReminder) {
         result = await reminderService.updateReminder(editingReminder.id, reminderData);
-        Alert.alert('Success', 'Reminder updated successfully!');
+        showSuccess('Reminder updated successfully!');
       } else {
         result = await reminderService.createReminder(reminderData);
-        Alert.alert('Success', 'Reminder created successfully!');
+        showSuccess('Reminder created successfully!');
       }
 
       resetForm();
       await loadReminders();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save reminder');
+      showError(error.message || 'Failed to save reminder');
     } finally {
       setIsSubmitting(false);
     }
@@ -222,26 +218,27 @@ export default function RemindersScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Reminders</Text>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => {
-              if (editingReminder) {
-                resetForm();
-              } else {
-                setShowAddForm(!showAddForm);
-              }
-            }}
-          >
-            <Plus size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Reminders" showBack showMenu={false} />
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.addButtonContainer}>
+            <TouchableOpacity 
+              style={styles.addReminderButton}
+              onPress={() => {
+                if (editingReminder) {
+                  resetForm();
+                } else {
+                  setShowAddForm(!showAddForm);
+                }
+              }}
+            >
+              <Plus size={24} color="#FFFFFF" />
+              <Text style={styles.addReminderButtonText}>
+                {showAddForm ? 'Cancel' : 'Add New Reminder'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {showAddForm && (
             <View style={styles.addForm}>
               <Text style={styles.formTitle}>
@@ -547,6 +544,32 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  addButtonContainer: {
+    padding: 16,
+    paddingBottom: 0,
+  },
+  addReminderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6A9FB5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
+    shadowColor: '#6A9FB5',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addReminderButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
   },
   addForm: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',

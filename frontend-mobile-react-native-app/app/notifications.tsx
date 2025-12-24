@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
+import AppHeader from '@/components/AppHeader';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -37,27 +38,19 @@ export default function NotificationsScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.title}>Notifications</Text>
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
-            )}
-          </View>
-          {unreadCount > 0 && (
+        <AppHeader title="Notifications" showBack showMenu={false} showNotification={false} />
+        
+        {unreadCount > 0 && (
+          <View style={styles.markAllContainer}>
             <TouchableOpacity
               style={styles.markAllButton}
               onPress={handleMarkAllAsRead}
             >
               <CheckCheck size={20} color="#6A9FB5" />
+              <Text style={styles.markAllText}>Mark all as read</Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {isLoading ? (
@@ -168,13 +161,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'OpenSans-Bold',
   },
+  markAllContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
   markAllButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(106, 159, 181, 0.2)',
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(106, 159, 181, 0.2)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  markAllText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#6A9FB5',
   },
   scrollView: {
     flex: 1,

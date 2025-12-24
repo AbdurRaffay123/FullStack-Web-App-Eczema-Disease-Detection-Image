@@ -4,6 +4,7 @@ import { ArrowLeft, Search, Droplets, Sun, Thermometer, Heart, Shield, Lightbulb
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
+import AppHeader from '@/components/AppHeader';
 
 export default function TipsScreen() {
   const router = useRouter();
@@ -185,13 +186,7 @@ Clothing care tips:
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Skincare Tips</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AppHeader title="Skincare Tips" showBack showMenu={false} />
 
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>

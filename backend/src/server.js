@@ -34,12 +34,14 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
-    // Start Express server
+    // Start Express server - listen on all interfaces for mobile access
     const PORT = appConfig.PORT;
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+    const HOST = '0.0.0.0'; // Listen on all interfaces
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on ${HOST}:${PORT}`);
       console.log(`🌍 Environment: ${appConfig.NODE_ENV}`);
       console.log(`📡 API Base URL: http://localhost:${PORT}/api`);
+      console.log(`📱 Mobile Access: http://<your-ip>:${PORT}/api`);
       console.log(`✅ JWT_SECRET: ${process.env.JWT_SECRET ? 'Set ✓' : 'Missing ✗'}`);
       
       // Start reminder scheduler

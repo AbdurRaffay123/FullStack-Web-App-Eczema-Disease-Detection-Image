@@ -1,11 +1,13 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, Alert, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, TextInput, ActivityIndicator, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Phone, MessageCircle, Video, Star, MapPin, Clock, Calendar, User, Mail, X, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Phone, Video, Star, MapPin, Clock, Calendar, User, Mail, X, CheckCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
 import { consultationService, CreateConsultationData } from '@/services/consultationService';
 import { userService, UserProfile } from '@/services/userService';
+import AppHeader from '@/components/AppHeader';
+import { useModalHelpers } from '@/context/ModalContext';
 
 interface Doctor {
   id: number;
@@ -25,9 +27,10 @@ interface Doctor {
 
 export default function ConsultScreen() {
   const router = useRouter();
+  const { showSuccess, showError, showConfirm } = useModalHelpers();
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [consultationType, setConsultationType] = useState<'video' | 'phone' | 'chat'>('video');
+  const [consultationType, setConsultationType] = useState<'video' | 'phone'>('video');
   const [preferredDate, setPreferredDate] = useState<string>('');
   const [preferredTime, setPreferredTime] = useState<string>('');
   const [reason, setReason] = useState('');
@@ -86,7 +89,7 @@ export default function ConsultScreen() {
   const consultationTypes = [
     {
       id: 'video',
-      title: 'Video Consultation',
+      title: 'Video Call',
       subtitle: 'Face-to-face consultation from home',
       icon: Video,
       color: '#6A9FB5',
@@ -94,19 +97,11 @@ export default function ConsultScreen() {
     },
     {
       id: 'phone',
-      title: 'Phone Consultation',
+      title: 'Audio Call',
       subtitle: 'Quick consultation over the phone',
       icon: Phone,
       color: '#28A745',
       duration: '20 minutes',
-    },
-    {
-      id: 'chat',
-      title: 'Text Consultation',
-      subtitle: 'Get advice through secure messaging',
-      icon: MessageCircle,
-      color: '#FFA500',
-      duration: '24h response',
     },
   ];
 
@@ -127,9 +122,9 @@ export default function ConsultScreen() {
     }
   };
 
-  const handleBookConsultation = (doctor: Doctor, type: 'video' | 'phone' | 'chat') => {
+  const handleBookConsultation = (doctor: Doctor) => {
     setSelectedDoctor(doctor);
-    setConsultationType(type);
+    setConsultationType('video'); // Default to video
     setShowBookingModal(true);
     // Reset form - set tomorrow as default date
     const tomorrow = new Date();
@@ -144,21 +139,21 @@ export default function ConsultScreen() {
 
     // Validate form
     if (!reason.trim() || reason.trim().length < 10) {
-      Alert.alert('Validation Error', 'Please provide a reason for consultation (at least 10 characters)');
+      showError('Please provide a reason for consultation (at least 10 characters)', 'Validation Error');
       return;
     }
 
     // Validate date format
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(preferredDate)) {
-      Alert.alert('Validation Error', 'Please enter a valid date in YYYY-MM-DD format');
+      showError('Please enter a valid date in YYYY-MM-DD format', 'Validation Error');
       return;
     }
 
     // Validate time format
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     if (!timeRegex.test(preferredTime)) {
-      Alert.alert('Validation Error', 'Please enter a valid time in HH:MM format (24-hour)');
+      showError('Please enter a valid time in HH:MM format (24-hour)', 'Validation Error');
       return;
     }
 
@@ -168,7 +163,7 @@ export default function ConsultScreen() {
     selectedDateTime.setHours(hours, minutes, 0, 0);
     
     if (selectedDateTime <= new Date()) {
-      Alert.alert('Validation Error', 'Preferred date and time must be in the future');
+      showError('Preferred date and time must be in the future', 'Validation Error');
       return;
     }
 
@@ -191,69 +186,52 @@ export default function ConsultScreen() {
       };
 
       await consultationService.createConsultation(bookingData);
-      Alert.alert(
-        'Success',
+      showSuccess(
         `Consultation with ${selectedDoctor.name} booked successfully! Confirmation emails have been sent to you and the doctor.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowBookingModal(false);
-              setSelectedDoctor(null);
-              // Reset form
-              setPreferredDate('');
-              setPreferredTime('');
-              setReason('');
-              setConsultationType('video');
-            },
-          },
-        ]
+        'Success',
+        () => {
+          setShowBookingModal(false);
+          setSelectedDoctor(null);
+          // Reset form
+          setPreferredDate('');
+          setPreferredTime('');
+          setReason('');
+          setConsultationType('video');
+        }
       );
     } catch (error: any) {
       // Handle profile incomplete error
       if (error.message?.includes('PROFILE_INCOMPLETE')) {
         const errorMsg = error.message.replace('PROFILE_INCOMPLETE: ', '');
-        Alert.alert(
-          'Profile Incomplete',
+        showConfirm(
           errorMsg,
-          [
-            {
-              text: 'Go to Profile',
-              onPress: () => {
-                setShowBookingModal(false);
-                router.push('/(tabs)/profile');
-              },
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
+          'Profile Incomplete',
+          () => {
+            setShowBookingModal(false);
+            router.push('/(tabs)/profile');
+          },
+          () => {
+            // Cancel - do nothing
+          }
         );
       } else if (error.message?.includes('Profile incomplete')) {
-        Alert.alert(
-          'Profile Incomplete',
+        showConfirm(
           'Please complete your profile before booking a consultation',
-          [
-            {
-              text: 'Go to Profile',
-              onPress: () => {
-                setShowBookingModal(false);
-                router.push('/(tabs)/profile');
-              },
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
+          'Profile Incomplete',
+          () => {
+            setShowBookingModal(false);
+            router.push('/(tabs)/profile');
+          },
+          () => {
+            // Cancel - do nothing
+          }
         );
       } else if (error.message?.includes('validation') || error.message?.includes('required')) {
-        Alert.alert('Validation Error', error.message || 'Please check all required fields');
+        showError(error.message || 'Please check all required fields', 'Validation Error');
       } else if (error.message?.includes('network') || error.message?.includes('Network')) {
-        Alert.alert('Network Error', 'Please check your connection and try again.');
+        showError('Please check your connection and try again.', 'Network Error');
       } else {
-        Alert.alert('Error', error.message || 'Failed to book consultation. Please try again.');
+        showError(error.message || 'Failed to book consultation. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -282,13 +260,7 @@ export default function ConsultScreen() {
         colors={['#1A1A2E', '#16213E', '#0F3460']}
         style={styles.backgroundGradient}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Healthcare Specialists</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AppHeader title="Healthcare Specialists" showBack showMenu={false} />
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.emergencySection}>
@@ -300,22 +272,6 @@ export default function ConsultScreen() {
               <Phone size={20} color="#FFFFFF" />
               <Text style={styles.emergencyButtonText}>Call Emergency Services</Text>
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.consultationTypesSection}>
-            <Text style={styles.sectionTitle}>Consultation Types</Text>
-            <View style={styles.consultationGrid}>
-              {consultationTypes.map((type) => (
-                <View key={type.id} style={styles.consultationCard}>
-                  <View style={[styles.consultationIcon, { backgroundColor: type.color }]}>
-                    <type.icon size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.consultationTitle}>{type.title}</Text>
-                  <Text style={styles.consultationSubtitle}>{type.subtitle}</Text>
-                  <Text style={styles.consultationDuration}>{type.duration}</Text>
-                </View>
-              ))}
-            </View>
           </View>
 
           <View style={styles.specialistsSection}>
@@ -368,29 +324,12 @@ export default function ConsultScreen() {
 
                   <View style={styles.consultationActions}>
                     <Text style={styles.consultationFee}>{doctor.consultationFee}</Text>
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, styles.videoButton]}
-                        onPress={() => handleBookConsultation(doctor, 'video')}
-                      >
-                        <Video size={16} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Video</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, styles.phoneButton]}
-                        onPress={() => handleBookConsultation(doctor, 'phone')}
-                      >
-                        <Phone size={16} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Call</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, styles.chatButton]}
-                        onPress={() => handleBookConsultation(doctor, 'chat')}
-                      >
-                        <MessageCircle size={16} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Chat</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity 
+                      style={styles.bookNowButton}
+                      onPress={() => handleBookConsultation(doctor)}
+                    >
+                      <Text style={styles.bookNowButtonText}>Book Now</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
@@ -399,24 +338,24 @@ export default function ConsultScreen() {
 
           <View style={styles.infoSection}>
             <Text style={styles.infoTitle}>How it works</Text>
-            <View style={styles.infoSteps}>
+              <View style={styles.infoSteps}>
               <View style={styles.infoStep}>
                 <View style={styles.stepNumber}>
                   <Text style={styles.stepNumberText}>1</Text>
-                </View>
-                <Text style={styles.stepText}>Choose your preferred consultation type</Text>
-              </View>
-              <View style={styles.infoStep}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>2</Text>
                 </View>
                 <Text style={styles.stepText}>Select an available specialist</Text>
               </View>
               <View style={styles.infoStep}>
                 <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>2</Text>
+                </View>
+                <Text style={styles.stepText}>Click "Book Now" and fill in the form</Text>
+              </View>
+              <View style={styles.infoStep}>
+                <View style={styles.stepNumber}>
                   <Text style={styles.stepNumberText}>3</Text>
                 </View>
-                <Text style={styles.stepText}>Book your appointment and get expert care</Text>
+                <Text style={styles.stepText}>Choose consultation type (Video or Audio) and confirm booking</Text>
               </View>
             </View>
           </View>
@@ -512,7 +451,7 @@ export default function ConsultScreen() {
                             styles.typeButton,
                             isSelected && { backgroundColor: type.color, borderColor: type.color },
                           ]}
-                          onPress={() => setConsultationType(type.id as 'video' | 'phone' | 'chat')}
+                          onPress={() => setConsultationType(type.id as 'video' | 'phone')}
                         >
                           <IconComponent size={20} color={isSelected ? '#FFFFFF' : type.color} />
                           <Text
@@ -521,7 +460,7 @@ export default function ConsultScreen() {
                               isSelected && styles.typeButtonTextSelected,
                             ]}
                           >
-                            {type.title.replace(' Consultation', '')}
+                            {type.title}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -694,56 +633,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
   },
-  consultationTypesSection: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  consultationGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  consultationCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  consultationIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  consultationTitle: {
-    fontSize: 14,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  consultationSubtitle: {
-    fontSize: 12,
-    fontFamily: 'OpenSans-Regular',
-    color: '#B0B0B0',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  consultationDuration: {
-    fontSize: 12,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#6A9FB5',
-  },
   specialistsSection: {
     padding: 16,
     paddingTop: 0,
@@ -836,30 +725,18 @@ const styles = StyleSheet.create({
     color: '#28A745',
     marginBottom: 12,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 4,
-  },
-  videoButton: {
+  bookNowButton: {
     backgroundColor: '#6A9FB5',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 25,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  phoneButton: {
-    backgroundColor: '#28A745',
-  },
-  chatButton: {
-    backgroundColor: '#FFA500',
-  },
-  actionButtonText: {
+  bookNowButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 16,
     fontFamily: 'OpenSans-SemiBold',
   },
   infoSection: {

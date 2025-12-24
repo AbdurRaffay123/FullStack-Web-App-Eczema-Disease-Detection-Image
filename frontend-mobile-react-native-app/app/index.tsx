@@ -1,13 +1,15 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authService } from '../services/authService';
+import { useModalHelpers } from '@/context/ModalContext';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { showSuccess, showError } = useModalHelpers();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -40,11 +42,11 @@ export default function LoginScreen() {
 
     try {
       await authService.login({ email, password });
-      Alert.alert('Success', 'Login successful!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      showSuccess('Login successful!', 'Success', () => {
+        router.replace('/(tabs)');
+      });
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Invalid email or password. Please try again.');
+      showError(error.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }

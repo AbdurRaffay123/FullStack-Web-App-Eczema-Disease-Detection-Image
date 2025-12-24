@@ -7,7 +7,9 @@
 const getApiBaseUrl = (): string => {
   // For Expo, use Constants.expoConfig.extra or process.env
   // In production, set EXPO_PUBLIC_API_URL in your .env file
-  return process.env.EXPO_PUBLIC_API_URL || 'http://192.168.100.34:3000/api';
+  // IMPORTANT: Update this IP to your computer's current local IP address
+  // Run 'hostname -I | awk "{print $1}"' to get your IP
+  return process.env.EXPO_PUBLIC_API_URL || 'http://192.168.18.224:3000/api';
 };
 
 export const API_CONFIG = {
