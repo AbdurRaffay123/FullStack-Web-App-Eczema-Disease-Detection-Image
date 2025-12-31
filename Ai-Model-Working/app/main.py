@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from app.services.model_service import ModelService
 from app.services.relevance_detector import RelevanceDetector
 from app.services.severity_estimator import SeverityEstimator
+from app.services.uncertainty_detector import UncertaintyDetector
 from app.services.llm_service import LLMService
 from app.schemas.response import AnalysisResponse, ErrorResponse
 from app.utils.image_processor import ImageProcessor
@@ -25,6 +26,7 @@ load_dotenv()
 model_service = None
 relevance_detector = None
 severity_estimator = None
+uncertainty_detector = None
 llm_service = None
 image_processor = None
 
@@ -32,7 +34,7 @@ image_processor = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown"""
-    global model_service, relevance_detector, severity_estimator, llm_service, image_processor
+    global model_service, relevance_detector, severity_estimator, uncertainty_detector, llm_service, image_processor
     
     # Startup
     try:
@@ -52,6 +54,7 @@ async def lifespan(app: FastAPI):
         # Initialize other services (always available)
         relevance_detector = RelevanceDetector()
         severity_estimator = SeverityEstimator()
+        uncertainty_detector = UncertaintyDetector()  # NEW: Uncertainty detection service
         
         # Official Google Gemini API key from AI Studio (https://aistudio.google.com/app)
         gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -62,6 +65,7 @@ async def lifespan(app: FastAPI):
         image_processor = ImageProcessor()
         
         print("✅ All services initialized successfully")
+        print("✅ Uncertainty detection enabled")
     except Exception as e:
         print(f"❌ Error initializing services: {e}")
         # Don't raise - allow service to start even if some services fail
@@ -112,16 +116,22 @@ async def analyze_image(file: UploadFile = File(...)):
     """
     Analyze uploaded image for eczema detection
     
-    Flow:
-    1. Validate and preprocess image
-    2. Check image relevance (human skin detection)
-    3. Run eczema prediction if relevant
-    4. Estimate severity if eczema detected
-    5. Generate LLM explanation
-    6. Return structured response
+    RESTRUCTURED INFERENCE PIPELINE (STRICT ORDER):
+    1. Image validation (format, size)
+    2. Human skin / face relevance check (FIXED: accepts faces)
+    3. Model inference (binary)
+    4. Confidence band evaluation
+    5. OOD / uncertainty detection
+    6. Final decision mapping (Eczema | Normal | Uncertain)
+    7. Explanation generation (LLM-assisted with uncertainty handling)
+    
+    Returns:
+        AnalysisResponse with prediction: "Eczema" | "Normal" | "Uncertain"
     """
     try:
-        # Validate file type
+        # ============================================
+        # STEP 1: Image Validation (format, size)
+        # ============================================
         if not file.content_type or not file.content_type.startswith("image/"):
             raise HTTPException(
                 status_code=400,
@@ -140,19 +150,26 @@ async def analyze_image(file: UploadFile = File(...)):
                 detail="Failed to process image. Please ensure it's a valid image file."
             )
         
-        # Step 1: Check image relevance
+        # ============================================
+        # STEP 2: Human Skin / Face Relevance Check
+        # FIXED: Now accepts face images and all human skin areas
+        # ============================================
         is_relevant, relevance_reason = await relevance_detector.check_relevance(processed_image)
         
         if not is_relevant:
             return AnalysisResponse(
                 relevant=False,
+                prediction="Normal",  # Not relevant = Normal (not eczema)
                 eczema_detected=False,
                 confidence=0.0,
                 message=relevance_reason,
+                reasoning="Image does not appear to contain human skin.",
                 disclaimer="This is an AI-based assessment and not a medical diagnosis."
             )
         
-        # Step 2: Run eczema prediction (check if model is loaded)
+        # ============================================
+        # STEP 3: Model Inference (Binary)
+        # ============================================
         if model_service is None or not model_service.is_loaded():
             raise HTTPException(
                 status_code=503,
@@ -160,85 +177,123 @@ async def analyze_image(file: UploadFile = File(...)):
             )
         
         prediction_result = await model_service.predict(processed_image)
-        
         eczema_probability = float(prediction_result["eczema_probability"])
-        is_eczema = eczema_probability > 0.5  # Threshold can be adjusted
         
-        # Step 3: Estimate severity if eczema detected
-        severity = None
-        if is_eczema:
-            severity = await severity_estimator.estimate_severity(
-                processed_image,
-                eczema_probability,
-                prediction_result
-            )
+        # ============================================
+        # STEP 4: Confidence Band Evaluation
+        # ============================================
+        confidence_band = uncertainty_detector.get_confidence_band(eczema_probability)
         
-        # Step 4: Generate LLM explanation with vision analysis
-        # Pass original image bytes so Gemini can analyze the image directly
-        # This allows Gemini to correct the custom model's mistakes
-        explanation, gemini_eczema_detected, gemini_confidence = await llm_service.generate_explanation(
-            eczema_probability=eczema_probability,
-            is_eczema=is_eczema,
-            severity=severity,
-            image_bytes=image_bytes  # Pass original image for Gemini vision analysis
+        # ============================================
+        # STEP 5: OOD / Uncertainty Detection
+        # ============================================
+        is_uncertain, uncertainty_reason, adjusted_confidence = await uncertainty_detector.evaluate_uncertainty(
+            processed_image,
+            eczema_probability,
+            prediction_result
         )
         
-        # Step 5: Use Gemini's assessment to correct custom model if needed
-        # If Gemini sees eczema but custom model doesn't, trust Gemini (it has vision)
-        # If both agree, use custom model's probability
-        # If Gemini doesn't provide assessment, use custom model
-        
-        final_eczema_detected = is_eczema
-        final_confidence = eczema_probability
-        
-        if gemini_eczema_detected is not None:
-            # Gemini provided its own assessment
-            if gemini_eczema_detected and not is_eczema:
-                # Gemini sees eczema but custom model missed it - trust Gemini
-                final_eczema_detected = True
-                final_confidence = gemini_confidence if gemini_confidence else 0.7
-                print(f"⚠️  Custom model missed eczema, but Gemini detected it. Using Gemini's assessment.")
-            elif not gemini_eczema_detected and is_eczema:
-                # Gemini doesn't see eczema but custom model detected it - use weighted average
-                # Trust Gemini more but consider custom model
-                final_confidence = (eczema_probability * 0.3) + (gemini_confidence if gemini_confidence else 0.3)
-                if final_confidence < 0.5:
-                    final_eczema_detected = False
-                print(f"⚠️  Custom model detected eczema, but Gemini disagrees. Using combined assessment.")
-            elif gemini_eczema_detected and is_eczema:
-                # Both agree - use weighted average favoring Gemini
-                final_confidence = (eczema_probability * 0.4) + (gemini_confidence if gemini_confidence else eczema_probability * 0.6)
-                final_eczema_detected = True
-        
-        # Step 6: Re-estimate severity if final detection changed
-        final_severity = severity
-        if final_eczema_detected and not is_eczema:
-            # Gemini detected eczema but custom model didn't - estimate severity
-            final_severity = await severity_estimator.estimate_severity(
-                processed_image,
-                final_confidence,
-                {"eczema_probability": final_confidence}
-            )
-        
-        # Step 7: Build response
-        if final_eczema_detected:
-            return AnalysisResponse(
-                relevant=True,
-                eczema_detected=True,
-                confidence=round(final_confidence, 2),
-                severity=final_severity,
-                explanation=explanation,
-                disclaimer="This is an AI-based assessment and not a medical diagnosis. Please consult a healthcare professional for proper medical advice."
-            )
+        # ============================================
+        # STEP 6: Final Decision Mapping
+        # Three-state prediction: Eczema | Normal | Uncertain
+        # ============================================
+        if is_uncertain:
+            # Route to "Uncertain / Other Skin Condition" state
+            prediction_state = "Uncertain"
+            final_confidence = adjusted_confidence
+            final_eczema_detected = False  # Uncertain is not eczema
+            severity = None  # No severity for uncertain cases
         else:
-            return AnalysisResponse(
-                relevant=True,
-                eczema_detected=False,
-                confidence=round(1 - final_confidence, 2),
-                message="No strong eczema patterns detected in the image.",
-                explanation=explanation,
-                disclaimer="This is an AI-based assessment and not a medical diagnosis."
-            )
+            # High confidence cases: route to Eczema or Normal
+            if eczema_probability >= uncertainty_detector.high_confidence_threshold:
+                prediction_state = "Eczema"
+                final_confidence = eczema_probability
+                final_eczema_detected = True
+                # Estimate severity for eczema cases
+                severity = await severity_estimator.estimate_severity(
+                    processed_image,
+                    eczema_probability,
+                    prediction_result
+                )
+            elif eczema_probability <= uncertainty_detector.low_confidence_threshold:
+                prediction_state = "Normal"
+                final_confidence = 1.0 - eczema_probability  # Confidence for "Normal"
+                final_eczema_detected = False
+                severity = None
+            else:
+                # Medium confidence: route to Uncertain (safety fallback)
+                prediction_state = "Uncertain"
+                final_confidence = 0.5
+                final_eczema_detected = False
+                severity = None
+                uncertainty_reason = "Confidence falls in ambiguous range between high and low thresholds."
+        
+        # ============================================
+        # STEP 7: Explanation Generation (LLM-Assisted)
+        # Handles uncertainty explanations
+        # ============================================
+        explanation, gemini_assessment, gemini_confidence = await llm_service.generate_explanation(
+            eczema_probability=eczema_probability,
+            prediction_state=prediction_state,
+            severity=severity,
+            image_bytes=image_bytes,
+            uncertainty_reason=uncertainty_reason if prediction_state == "Uncertain" else None
+        )
+        
+        # Optional: Use Gemini's assessment to refine prediction (if available and not uncertain)
+        # Only refine if Gemini provides clear assessment and we're not already uncertain
+        if gemini_assessment is not None and prediction_state != "Uncertain":
+            # If Gemini is uncertain (None), keep our prediction
+            # If Gemini disagrees strongly, consider adjusting
+            if prediction_state == "Eczema" and not gemini_assessment:
+                # Model says eczema but Gemini says no - reduce confidence but don't change to Uncertain
+                # (already passed uncertainty check)
+                if gemini_confidence and gemini_confidence < 0.3:
+                    # Strong disagreement - route to Uncertain
+                    prediction_state = "Uncertain"
+                    final_confidence = 0.5
+                    final_eczema_detected = False
+                    severity = None
+                    uncertainty_reason = "Model and vision analysis disagree significantly."
+            elif prediction_state == "Normal" and gemini_assessment:
+                # Model says normal but Gemini sees eczema - trust Gemini more
+                if gemini_confidence and gemini_confidence > 0.6:
+                    prediction_state = "Eczema"
+                    final_confidence = gemini_confidence
+                    final_eczema_detected = True
+                    severity = await severity_estimator.estimate_severity(
+                        processed_image,
+                        gemini_confidence,
+                        {"eczema_probability": gemini_confidence}
+                    )
+        
+        # Build reasoning string
+        reasoning_parts = []
+        if prediction_state == "Uncertain":
+            reasoning_parts.append(f"Uncertainty detected: {uncertainty_reason or 'Confidence in ambiguous range'}.")
+        else:
+            reasoning_parts.append(f"Confidence band: {confidence_band}.")
+            if prediction_state == "Eczema":
+                reasoning_parts.append(f"High confidence eczema detection ({int(final_confidence * 100)}%).")
+            else:
+                reasoning_parts.append(f"High confidence no eczema ({int(final_confidence * 100)}%).")
+        
+        reasoning = " ".join(reasoning_parts)
+        
+        # ============================================
+        # Build Final Response
+        # ============================================
+        return AnalysisResponse(
+            relevant=True,
+            prediction=prediction_state,
+            eczema_detected=final_eczema_detected,
+            confidence=round(final_confidence, 2),
+            severity=severity,
+            explanation=explanation,
+            reasoning=reasoning,
+            message=None if prediction_state != "Uncertain" else "The image shows patterns that cannot be confidently classified as eczema or normal skin.",
+            disclaimer="This is an AI-based assessment and not a medical diagnosis. Please consult a healthcare professional for proper medical advice."
+        )
     
     except HTTPException:
         raise

@@ -144,3 +144,6 @@ Environment variables (`.env`):
 - Severity estimation uses heuristics, not medical diagnosis
 
 
+
+
+
