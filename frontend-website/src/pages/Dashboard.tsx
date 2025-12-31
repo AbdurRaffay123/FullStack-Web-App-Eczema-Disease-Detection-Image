@@ -13,7 +13,8 @@ import {
   Heart,
   CheckCircle,
   Loader,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -168,9 +169,24 @@ const Dashboard: React.FC = () => {
 
       {/* Recent Activity */}
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-white mb-6">Recent Activity</h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-white">Recent Activity</h2>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="p-2 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition-all disabled:opacity-50"
+            title="Refresh data"
+          >
+            <RefreshCw className={`h-5 w-5 text-[#6A9FB5] ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
         <div className="space-y-4">
-          {recentActivity.length === 0 ? (
+          {loading && recentActivity.length === 0 ? (
+            <div className="text-center py-8">
+              <Loader className="h-12 w-12 animate-spin text-[#6A9FB5] mx-auto mb-4" />
+              <p className="text-gray-400">Loading recent activity...</p>
+            </div>
+          ) : recentActivity.length === 0 ? (
             <div className="text-center py-8">
               <Clock className="h-12 w-12 text-gray-500 mx-auto mb-4" />
               <p className="text-gray-400">No recent activity yet</p>
@@ -236,29 +252,46 @@ const Dashboard: React.FC = () => {
 
       {/* Summary Stats */}
       <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-white mb-6">Your Summary</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
-            <Camera className="h-8 w-8 text-[#6A9FB5] mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{stats?.totalScans || 0}</p>
-            <p className="text-gray-400 text-sm">Total Scans</p>
-          </div>
-          <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
-            <FileText className="h-8 w-8 text-[#C5B4E3] mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{stats?.totalLogs || 0}</p>
-            <p className="text-gray-400 text-sm">Symptom Logs</p>
-          </div>
-          <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
-            <Bell className="h-8 w-8 text-[#10B981] mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{stats?.totalReminders || 0}</p>
-            <p className="text-gray-400 text-sm">Reminders</p>
-          </div>
-          <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
-            <Stethoscope className="h-8 w-8 text-[#EF4444] mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{stats?.totalConsultations || 0}</p>
-            <p className="text-gray-400 text-sm">Consultations</p>
-          </div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-white">Your Summary</h2>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="p-2 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition-all disabled:opacity-50"
+            title="Refresh data"
+          >
+            <RefreshCw className={`h-5 w-5 text-[#6A9FB5] ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
+        {loading && !stats ? (
+          <div className="text-center py-8">
+            <Loader className="h-12 w-12 animate-spin text-[#6A9FB5] mx-auto mb-4" />
+            <p className="text-gray-400">Loading summary...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
+              <Camera className="h-8 w-8 text-[#6A9FB5] mx-auto mb-2" />
+              <p className="text-2xl font-bold text-white">{stats?.totalScans || 0}</p>
+              <p className="text-gray-400 text-sm">Total Scans</p>
+            </div>
+            <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
+              <FileText className="h-8 w-8 text-[#C5B4E3] mx-auto mb-2" />
+              <p className="text-2xl font-bold text-white">{stats?.totalLogs || 0}</p>
+              <p className="text-gray-400 text-sm">Symptom Logs</p>
+            </div>
+            <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
+              <Bell className="h-8 w-8 text-[#10B981] mx-auto mb-2" />
+              <p className="text-2xl font-bold text-white">{stats?.totalReminders || 0}</p>
+              <p className="text-gray-400 text-sm">Reminders</p>
+            </div>
+            <div className="text-center p-4 bg-white bg-opacity-5 rounded-lg">
+              <Stethoscope className="h-8 w-8 text-[#EF4444] mx-auto mb-2" />
+              <p className="text-2xl font-bold text-white">{stats?.totalConsultations || 0}</p>
+              <p className="text-gray-400 text-sm">Consultations</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

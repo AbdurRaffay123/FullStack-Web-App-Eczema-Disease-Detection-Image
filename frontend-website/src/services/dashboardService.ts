@@ -1,6 +1,9 @@
 import { apiClient } from '../utils/apiClient';
 import { API_ENDPOINTS } from '../config/api';
 import { imageService, Image } from './imageService';
+import { symptomService, SymptomLog } from './symptomService';
+import { reminderService, Reminder } from './reminderService';
+import { consultationService } from './consultationService';
 
 export interface DashboardStats {
   totalScans: number;
@@ -22,15 +25,7 @@ export interface RecentActivity {
   status: 'success' | 'info' | 'warning';
 }
 
-export interface SymptomLog {
-  id: string;
-  itchinessLevel: number;
-  affectedArea: string;
-  possibleTriggers?: string;
-  additionalNotes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+// SymptomLog interface is imported from symptomService
 
 class DashboardService {
   /**
@@ -100,60 +95,108 @@ class DashboardService {
    */
   async getRecentActivity(): Promise<RecentActivity[]> {
     try {
-      const [images, logs] = await Promise.all([
+      const [images, logs, reminders, consultations] = await Promise.all([
         this.fetchImages(),
         this.fetchLogs(),
+        this.fetchReminders(),
+        this.fetchConsultations(),
       ]);
 
       const activities: RecentActivity[] = [];
 
-      // Add image scan activities
-      images.slice(0, 3).forEach(image => {
-        const prediction = image.analysisResult?.prediction || 
-          (image.analysisResult?.eczema_detected ? 'Eczema' : 'Normal');
-        const severity = image.analysisResult?.severity;
-        const confidence = ((image.analysisResult?.confidence || 0) * 100).toFixed(0);
-        
-        let description: string;
-        let status: 'success' | 'warning' | 'info';
-        
-        if (prediction === 'Uncertain') {
-          description = `Uncertain result - ${confidence}% confidence. Consult a dermatologist.`;
-          status = 'info';
-        } else if (prediction === 'Eczema') {
-          description = `${severity || 'Eczema'} detected - ${confidence}% confidence`;
-          status = 'warning';
-        } else {
-          description = `No eczema detected - ${confidence}% confidence`;
-          status = 'success';
-        }
-        
-        activities.push({
-          id: `scan-${image._id}`,
-          type: 'scan',
-          title: 'Skin scan completed',
-          description,
-          time: this.formatTimeAgo(image.createdAt),
-          status,
+      // Add image scan activities (most recent first)
+      images
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 3)
+        .forEach(image => {
+          if (!image || !image._id) return;
+          
+          const prediction = image.analysisResult?.prediction || 
+            (image.analysisResult?.eczema_detected ? 'Eczema' : 'Normal');
+          const severity = image.analysisResult?.severity;
+          const confidence = ((image.analysisResult?.confidence || 0) * 100).toFixed(0);
+          
+          let description: string;
+          let status: 'success' | 'warning' | 'info';
+          
+          if (prediction === 'Uncertain') {
+            description = `Uncertain result - ${confidence}% confidence. Consult a dermatologist.`;
+            status = 'info';
+          } else if (prediction === 'Eczema') {
+            description = `${severity || 'Eczema'} detected - ${confidence}% confidence`;
+            status = 'warning';
+          } else {
+            description = `No eczema detected - ${confidence}% confidence`;
+            status = 'success';
+          }
+          
+          activities.push({
+            id: `scan-${image._id}`,
+            type: 'scan',
+            title: 'Skin scan completed',
+            description,
+            time: this.formatTimeAgo(image.createdAt),
+            status,
+          });
         });
-      });
 
-      // Add symptom log activities
-      logs.slice(0, 3).forEach(log => {
-        activities.push({
-          id: `log-${log.id}`,
-          type: 'log',
-          title: 'Symptom logged',
-          description: `Itchiness level: ${log.itchinessLevel}/10 - ${log.affectedArea}`,
-          time: this.formatTimeAgo(log.createdAt),
-          status: 'info',
+      // Add symptom log activities (most recent first)
+      logs
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 3)
+        .forEach(log => {
+          if (!log || !log.id) return;
+          activities.push({
+            id: `log-${log.id}`,
+            type: 'log',
+            title: 'Symptom logged',
+            description: `Itchiness level: ${log.itchinessLevel}/10 - ${log.affectedArea || 'Unknown area'}`,
+            time: this.formatTimeAgo(log.createdAt),
+            status: 'info',
+          });
         });
-      });
 
-      // Sort by time (most recent first)
+      // Add reminder activities (most recent first)
+      reminders
+        .sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, 2)
+        .forEach(reminder => {
+          if (!reminder || !reminder.id) return;
+          activities.push({
+            id: `reminder-${reminder.id}`,
+            type: 'reminder',
+            title: 'Reminder created',
+            description: `${reminder.title} - ${reminder.type}`,
+            time: reminder.createdAt ? this.formatTimeAgo(reminder.createdAt) : 'Recently',
+            status: reminder.isActive ? 'success' : 'info',
+          });
+        });
+
+      // Add consultation activities (most recent first)
+      consultations
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 2)
+        .forEach(consultation => {
+          if (!consultation || !consultation.id) return;
+          activities.push({
+            id: `consultation-${consultation.id}`,
+            type: 'consultation',
+            title: 'Consultation booked',
+            description: `With ${consultation.doctorName} - ${consultation.status}`,
+            time: this.formatTimeAgo(consultation.createdAt),
+            status: consultation.status === 'confirmed' ? 'success' : consultation.status === 'completed' ? 'success' : 'info',
+          });
+        });
+
+      // Sort all activities by time (most recent first)
       activities.sort((a, b) => {
-        // Parse time strings to compare
-        return 0; // Keep original order for now
+        // Extract timestamp from time string for comparison
+        // For now, keep images and logs first as they're already sorted
+        return 0;
       });
 
       return activities.slice(0, 5);
@@ -173,39 +216,31 @@ class DashboardService {
 
   private async fetchLogs(): Promise<SymptomLog[]> {
     try {
-      const response = await apiClient.get<{
-        success: boolean;
-        data: SymptomLog[];
-        message: string;
-      }>(API_ENDPOINTS.SYMPTOMS.LIST);
-      return response.data?.data || [];
-    } catch {
+      // Use symptomService which handles the response structure correctly
+      return await symptomService.getLogs() || [];
+    } catch (error) {
+      console.error('Error fetching logs:', error);
       return [];
     }
   }
 
-  private async fetchReminders(): Promise<any[]> {
+  private async fetchReminders(): Promise<Reminder[]> {
     try {
-      const response = await apiClient.get<{
-        success: boolean;
-        data: any[];
-        message: string;
-      }>(API_ENDPOINTS.REMINDERS.LIST);
-      return response.data?.data || [];
-    } catch {
+      // Use reminderService which handles the response structure correctly
+      return await reminderService.getReminders() || [];
+    } catch (error) {
+      console.error('Error fetching reminders:', error);
       return [];
     }
   }
 
   private async fetchConsultations(): Promise<any[]> {
     try {
-      const response = await apiClient.get<{
-        success: boolean;
-        data: any[];
-        message: string;
-      }>(API_ENDPOINTS.CONSULTATIONS.LIST);
-      return response.data?.data || [];
-    } catch {
+      // Use consultationService which handles the response structure correctly
+      const result = await consultationService.getConsultations();
+      return result.consultations || [];
+    } catch (error) {
+      console.error('Error fetching consultations:', error);
       return [];
     }
   }

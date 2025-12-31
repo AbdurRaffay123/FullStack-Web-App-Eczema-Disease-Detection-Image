@@ -3,11 +3,13 @@ import { API_ENDPOINTS } from '../config/api';
 
 export interface ImageAnalysisResult {
   relevant: boolean;
-  eczema_detected: boolean;
+  prediction?: 'Eczema' | 'Normal' | 'Uncertain'; // New three-state prediction
+  eczema_detected: boolean; // Legacy field for backward compatibility
   confidence: number;
   severity?: string | null;
   explanation?: string;
   message?: string;
+  reasoning?: string; // New field for detailed reasoning
   disclaimer: string;
 }
 
