@@ -6,9 +6,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
+import { dashboardService } from '../../services/dashboardService';
 import AppHeader from '@/components/AppHeader';
 import { useDrawer } from '@/context/DrawerContext';
 import { useModalHelpers } from '@/context/ModalContext';
+import { Linking } from 'react-native';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -33,6 +35,11 @@ export default function ProfileScreen() {
     newPassword: '',
     confirmPassword: '',
   });
+  const [userStats, setUserStats] = useState({
+    totalLogs: 0,
+    totalScans: 0,
+    totalReminders: 0,
+  });
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -50,6 +57,14 @@ export default function ProfileScreen() {
           email: profile.email || '',
           phoneNumber: profile.phoneNumber || '',
           dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
+        });
+
+        // Load user statistics
+        const stats = await dashboardService.getDashboardStats();
+        setUserStats({
+          totalLogs: stats.totalLogs || 0,
+          totalScans: stats.totalScans || 0,
+          totalReminders: stats.totalReminders || 0,
         });
       } catch (error: any) {
         showError(error.message || 'Failed to load profile');
@@ -371,6 +386,28 @@ export default function ProfileScreen() {
     <View style={styles.sectionContent}>
       <Text style={styles.sectionTitle}>Help & Support</Text>
       
+      <View style={styles.infoBox}>
+        <Text style={styles.infoBoxTitle}>About Eczema Care</Text>
+        <Text style={styles.infoBoxText}>
+          Eczema Care is an AI-assisted eczema detection and tracking application designed to help you monitor your skin condition, track symptoms, and manage your eczema journey. Our AI-powered skin analysis provides preliminary assessments, but it is not a substitute for professional medical diagnosis.
+        </Text>
+      </View>
+
+      <View style={styles.infoBox}>
+        <Text style={styles.infoBoxTitle}>Medical Disclaimer</Text>
+        <Text style={styles.infoBoxText}>
+          This application provides AI-based assessments and is not a medical diagnosis tool. Always consult with a qualified healthcare professional, especially a dermatologist, for proper medical advice, diagnosis, and treatment. Do not use this app as a replacement for professional medical care.
+        </Text>
+      </View>
+
+      <TouchableOpacity 
+        style={styles.helpItem}
+        onPress={() => Linking.openURL('tel:1122')}
+      >
+        <Text style={styles.helpItemTitle}>Emergency Services</Text>
+        <Text style={styles.helpItemSubtitle}>Call 1122 for medical emergencies</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.helpItem}>
         <Text style={styles.helpItemTitle}>Frequently Asked Questions</Text>
         <Text style={styles.helpItemSubtitle}>Find answers to common questions</Text>
@@ -382,18 +419,8 @@ export default function ProfileScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.helpItem}>
-        <Text style={styles.helpItemTitle}>Report a Bug</Text>
-        <Text style={styles.helpItemSubtitle}>Help us improve the app</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.helpItem}>
         <Text style={styles.helpItemTitle}>Privacy Policy</Text>
         <Text style={styles.helpItemSubtitle}>Read our privacy policy</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.helpItem}>
-        <Text style={styles.helpItemTitle}>Terms of Service</Text>
-        <Text style={styles.helpItemSubtitle}>View terms and conditions</Text>
       </TouchableOpacity>
     </View>
   );
@@ -453,16 +480,16 @@ export default function ProfileScreen() {
 
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>24</Text>
+              <Text style={styles.statNumber}>{isLoadingProfile ? '...' : userStats.totalLogs}</Text>
               <Text style={styles.statLabel}>Symptom Logs</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>8</Text>
+              <Text style={styles.statNumber}>{isLoadingProfile ? '...' : userStats.totalScans}</Text>
               <Text style={styles.statLabel}>AI Scans</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>15</Text>
-              <Text style={styles.statLabel}>Tips Read</Text>
+              <Text style={styles.statNumber}>{isLoadingProfile ? '...' : userStats.totalReminders}</Text>
+              <Text style={styles.statLabel}>Reminders</Text>
             </View>
           </View>
 
@@ -783,6 +810,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'OpenSans-Regular',
     color: '#B0B0B0',
+  },
+  infoBox: {
+    backgroundColor: 'rgba(106, 159, 181, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(106, 159, 181, 0.3)',
+  },
+  infoBoxTitle: {
+    fontSize: 16,
+    fontFamily: 'OpenSans-SemiBold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  infoBoxText: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    lineHeight: 20,
   },
   actionsSection: {
     paddingHorizontal: 16,

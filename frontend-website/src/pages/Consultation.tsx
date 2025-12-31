@@ -83,82 +83,42 @@ const Consultation: React.FC = () => {
   const doctors: Doctor[] = [
     {
       id: '1',
-      name: 'Dr. Sarah Johnson',
-      specialty: 'Dermatologist',
+      name: 'Dr. Bilal Aslam',
+      specialty: 'Dermatologist / Skin Specialist',
       rating: 4.9,
-      reviews: 127,
-      location: 'New York, NY',
+      reviews: 156,
+      location: 'Lahore, Punjab',
       avatar: 'https://images.pexels.com/photos/5207262/pexels-photo-5207262.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
       availability: 'Available Today',
-      consultationTypes: ['video', 'phone', 'chat'],
-      languages: ['English', 'Spanish'],
-      experience: '12 years',
-      phone: '+1 (212) 555-0123',
-      email: 'abdurraffaykhan0732@gmail.com',
-      price: {
-        video: 150,
-        phone: 120,
-        chat: 80
-      }
-    },
-    {
-      id: '2',
-      name: 'Dr. Michael Chen',
-      specialty: 'Allergist & Immunologist',
-      rating: 4.8,
-      reviews: 89,
-      location: 'Los Angeles, CA',
-      avatar: 'https://images.pexels.com/photos/6789888/pexels-photo-6789888.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-      availability: 'Next Available: Tomorrow',
       consultationTypes: ['video', 'phone'],
-      languages: ['English', 'Mandarin'],
-      experience: '8 years',
-      phone: '+1 (310) 555-0456',
-      email: 'michael.chen@healthcare.com',
+      languages: ['English', 'Urdu'],
+      experience: '10 years',
+      phone: '+92 300 1234567',
+      email: 'dr.bilalaslam@healthcare.pk',
       price: {
-        video: 180,
-        phone: 140,
+        video: 3500,
+        phone: 3000,
         chat: 0
       }
     },
     {
-      id: '3',
-      name: 'Dr. Emily Rodriguez',
-      specialty: 'Pediatric Dermatologist',
-      rating: 4.9,
-      reviews: 156,
-      location: 'Chicago, IL',
-      avatar: 'https://images.pexels.com/photos/7445017/pexels-photo-7445017.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-      availability: 'Available Today',
-      consultationTypes: ['video', 'phone', 'chat'],
-      languages: ['English', 'Spanish', 'Portuguese'],
-      experience: '15 years',
-      phone: '+1 (312) 555-0789',
-      email: 'emily.rodriguez@healthcare.com',
-      price: {
-        video: 200,
-        phone: 160,
-        chat: 100
-      }
-    },
-    {
-      id: '4',
-      name: 'Dr. David Kumar',
+      id: '2',
+      name: 'Dr. Ayesha Malik',
       specialty: 'Dermatologist',
-      rating: 4.7,
-      reviews: 203,
-      location: 'Houston, TX',
-      avatar: 'https://images.pexels.com/photos/6129021/pexels-photo-6129021.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-      availability: 'Next Available: In 2 hours',
-      consultationTypes: ['video', 'chat'],
-      languages: ['English', 'Hindi'],
-      experience: '10 years',
-      phone: '+1 (713) 555-0321',
-      email: 'david.kumar@healthcare.com',
+      rating: 4.8,
+      reviews: 134,
+      location: 'Islamabad',
+      avatar: 'https://images.pexels.com/photos/6789888/pexels-photo-6789888.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
+      availability: 'Available Tomorrow',
+      consultationTypes: ['video', 'phone'],
+      languages: ['English', 'Urdu'],
+      experience: '9 years',
+      phone: '+92 300 2345678',
+      email: 'dr.ayeshamalik@healthcare.pk',
       price: {
-        video: 130,
-        phone: 0,
-        chat: 70
+        video: 3200,
+        phone: 2800,
+        chat: 0
       }
     }
   ];
@@ -286,7 +246,7 @@ const Consultation: React.FC = () => {
           <div>
             <h3 className="text-red-300 font-semibold">Medical Emergency?</h3>
             <p className="text-red-200 text-sm">
-              If you're experiencing a severe allergic reaction or emergency, call 911 immediately or visit your nearest emergency room.
+              If you're experiencing a severe allergic reaction or emergency, call 1122 immediately or visit your nearest emergency room.
             </p>
           </div>
           <button className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors whitespace-nowrap">

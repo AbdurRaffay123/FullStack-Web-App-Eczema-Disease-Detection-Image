@@ -171,25 +171,54 @@ export default function ImagesScreen() {
                         <>
                           <View style={styles.resultRow}>
                             <View style={styles.resultLeft}>
-                              {image.analysisResult.eczema_detected ? (
-                                <XCircle size={20} color="#DC3545" />
-                              ) : (
-                                <CheckCircle size={20} color="#28A745" />
-                              )}
-                              <Text
-                                style={[
-                                  styles.resultText,
-                                  {
-                                    color: image.analysisResult.eczema_detected
-                                      ? '#DC3545'
-                                      : '#28A745',
-                                  },
-                                ]}
-                              >
-                                {image.analysisResult.eczema_detected
-                                  ? 'Eczema Detected'
-                                  : 'No Eczema'}
-                              </Text>
+                              {(() => {
+                                const prediction = image.analysisResult.prediction || 
+                                  (image.analysisResult.eczema_detected ? 'Eczema' : 'Normal');
+                                
+                                if (prediction === 'Uncertain') {
+                                  return (
+                                    <>
+                                      <AlertCircle size={20} color="#FFA500" />
+                                      <Text
+                                        style={[
+                                          styles.resultText,
+                                          { color: '#FFA500' },
+                                        ]}
+                                      >
+                                        Uncertain
+                                      </Text>
+                                    </>
+                                  );
+                                } else if (prediction === 'Eczema') {
+                                  return (
+                                    <>
+                                      <XCircle size={20} color="#DC3545" />
+                                      <Text
+                                        style={[
+                                          styles.resultText,
+                                          { color: '#DC3545' },
+                                        ]}
+                                      >
+                                        Eczema Detected
+                                      </Text>
+                                    </>
+                                  );
+                                } else {
+                                  return (
+                                    <>
+                                      <CheckCircle size={20} color="#28A745" />
+                                      <Text
+                                        style={[
+                                          styles.resultText,
+                                          { color: '#28A745' },
+                                        ]}
+                                      >
+                                        No Eczema
+                                      </Text>
+                                    </>
+                                  );
+                                }
+                              })()}
                             </View>
                             <Text style={styles.confidenceText}>
                               {(image.analysisResult.confidence * 100).toFixed(0)}%

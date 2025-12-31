@@ -55,7 +55,15 @@ class DashboardService {
       // Calculate stats
       const totalScans = safeImages.length;
       const totalLogs = safeLogs.length;
-      const eczemaDetectedCount = safeImages.filter(img => img.analysisResult?.eczema_detected).length;
+      // Handle new prediction field or fallback to eczema_detected for backward compatibility
+      const eczemaDetectedCount = safeImages.filter(img => {
+        if (!img.analysisResult) return false;
+        const prediction = img.analysisResult.prediction;
+        if (prediction) {
+          return prediction === 'Eczema';
+        }
+        return img.analysisResult.eczema_detected || false;
+      }).length;
 
       // Calculate day streak (consecutive days with logs)
       const dayStreak = this.calculateDayStreak(safeLogs);
@@ -112,17 +120,32 @@ class DashboardService {
       // Add image scan activities
       safeImages.slice(0, 3).forEach(image => {
         if (!image || !image._id) return;
-        const hasEczema = image.analysisResult?.eczema_detected;
+        const prediction = image.analysisResult?.prediction || 
+          (image.analysisResult?.eczema_detected ? 'Eczema' : 'Normal');
         const severity = image.analysisResult?.severity;
+        const confidence = ((image.analysisResult?.confidence || 0) * 100).toFixed(0);
+        
+        let description: string;
+        let status: 'success' | 'warning' | 'info';
+        
+        if (prediction === 'Uncertain') {
+          description = `Uncertain result - ${confidence}% confidence. Consult a dermatologist.`;
+          status = 'info';
+        } else if (prediction === 'Eczema') {
+          description = `${severity || 'Eczema'} detected - ${confidence}% confidence`;
+          status = 'warning';
+        } else {
+          description = `No eczema detected - ${confidence}% confidence`;
+          status = 'success';
+        }
+        
         activities.push({
           id: `scan-${image._id}`,
           type: 'scan',
           title: 'Skin scan completed',
-          description: hasEczema 
-            ? `${severity || 'Eczema'} detected - ${((image.analysisResult?.confidence || 0) * 100).toFixed(0)}% confidence`
-            : 'No eczema detected',
+          description,
           time: this.formatTimeAgo(image.createdAt || new Date().toISOString()),
-          status: hasEczema ? 'warning' : 'success',
+          status,
         });
       });
 

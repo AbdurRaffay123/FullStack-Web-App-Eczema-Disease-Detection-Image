@@ -41,48 +41,33 @@ export default function ConsultScreen() {
   const specialists: Doctor[] = [
     {
       id: 1,
-      name: 'Dr. Junaid',
-      specialty: 'Dermatologist',
+      name: 'Dr. Bilal Aslam',
+      specialty: 'Dermatologist / Skin Specialist',
       rating: 4.9,
-      reviews: 127,
-      experience: '15 years',
-      location: 'Sheikhupura, Punjab',
+      reviews: 156,
+      experience: '10 years',
+      location: 'Lahore, Punjab',
       image: 'https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=400',
       availability: 'Available Today',
-      consultationFee: '$150',
+      consultationFee: 'PKR 3,500',
       languages: ['English', 'Urdu'],
       phone: '+92 300 1234567',
       email: 'abdurraffaykhan0732@gmail.com',
     },
     {
       id: 2,
-      name: 'Dr. Senan Rashid',
-      specialty: 'Pediatric Dermatologist',
+      name: 'Dr. Ayesha Malik',
+      specialty: 'Dermatologist',
       rating: 4.8,
-      reviews: 89,
-      experience: '12 years',
-      location: 'Lahore, Punjab',
+      reviews: 134,
+      experience: '9 years',
+      location: 'Islamabad',
       image: 'https://images.pexels.com/photos/5327921/pexels-photo-5327921.jpeg?auto=compress&cs=tinysrgb&w=400',
       availability: 'Available Tomorrow',
-      consultationFee: '$175',
+      consultationFee: 'PKR 3,200',
       languages: ['English', 'Urdu'],
       phone: '+92 300 2345678',
-      email: 'dr.senan@healthcare.com',
-    },
-    {
-      id: 3,
-      name: 'Dr. Waseem',
-      specialty: 'Dermatologist & Allergist',
-      rating: 4.9,
-      reviews: 203,
-      experience: '18 years',
-      location: 'Lahore, Punjab',
-      image: 'https://images.pexels.com/photos/5452293/pexels-photo-5452293.jpeg?auto=compress&cs=tinysrgb&w=400',
-      availability: 'Available Today',
-      consultationFee: '$160',
-      languages: ['English', 'Urdu', 'Punjabi'],
-      phone: '+92 300 3456789',
-      email: 'dr.waseem@healthcare.com',
+      email: 'dr.ayeshamalik@healthcare.pk',
     },
   ];
 
@@ -239,7 +224,7 @@ export default function ConsultScreen() {
   };
 
   const handleEmergencyCall = () => {
-    Linking.openURL('tel:911');
+    Linking.openURL('tel:1122');
   };
 
   const formatDateDisplay = (dateString: string) => {
@@ -266,7 +251,7 @@ export default function ConsultScreen() {
           <View style={styles.emergencySection}>
             <Text style={styles.emergencyTitle}>Emergency?</Text>
             <Text style={styles.emergencySubtitle}>
-              If you're experiencing a severe allergic reaction or emergency, call 911 immediately
+              If you're experiencing a severe allergic reaction or emergency, call 1122 immediately
             </Text>
             <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
               <Phone size={20} color="#FFFFFF" />

@@ -28,7 +28,20 @@ export default function AIScreen() {
   const getTips = () => {
     if (!analysisResult) return [];
     
-    if (analysisResult.eczema_detected) {
+    // Handle new three-state prediction system
+    const prediction = analysisResult.prediction || (analysisResult.eczema_detected ? 'Eczema' : 'Normal');
+    
+    if (prediction === 'Uncertain') {
+      return [
+        '⚠️ The analysis shows uncertain results',
+        '👨‍⚕️ Consult a dermatologist for proper evaluation',
+        '📸 Consider taking clearer photos in better lighting',
+        '🧴 Maintain a consistent skincare routine',
+        '📝 Keep track of symptoms and triggers',
+        '🏥 This may indicate a different skin condition',
+        '💡 Professional medical advice is recommended',
+      ];
+    } else if (prediction === 'Eczema') {
       const severity = analysisResult.severity?.toLowerCase();
       const baseTips = [
         '🧴 Keep your skin moisturized with fragrance-free lotions',
@@ -59,6 +72,7 @@ export default function AIScreen() {
         ];
       }
     } else {
+      // Normal
       return [
         '✅ Great news! No eczema patterns detected',
         '🧴 Continue moisturizing regularly',
@@ -271,29 +285,70 @@ export default function AIScreen() {
                 <>
                   <View style={styles.diagnosisCard}>
                     <Text style={styles.diagnosisTitle}>Analysis Result</Text>
-                    <Text style={[
-                      styles.diagnosisCondition,
-                      { color: analysisResult.eczema_detected ? '#DC3545' : '#28A745' }
-                    ]}>
-                      {analysisResult.eczema_detected ? 'Eczema Detected' : 'No Eczema Detected'}
-                    </Text>
-                    <View style={styles.confidenceContainer}>
-                      <Text style={styles.confidenceLabel}>Confidence: </Text>
-                      <Text style={styles.confidenceValue}>
-                        {(analysisResult.confidence * 100).toFixed(1)}%
-                      </Text>
-                    </View>
-                    {analysisResult.severity && (
-                      <Text style={styles.severityText}>
-                        Severity: {analysisResult.severity}
-                      </Text>
-                    )}
+                    {/* Handle new three-state prediction system */}
+                    {(() => {
+                      const prediction = analysisResult.prediction || (analysisResult.eczema_detected ? 'Eczema' : 'Normal');
+                      
+                      if (prediction === 'Uncertain') {
+                        return (
+                          <>
+                            <View style={styles.uncertainBadge}>
+                              <AlertCircle size={20} color="#FFA500" />
+                              <Text style={styles.uncertainText}>Uncertain / Other Skin Condition</Text>
+                            </View>
+                            <Text style={styles.uncertainDescription}>
+                              The image shows patterns that cannot be confidently classified as eczema or normal skin.
+                            </Text>
+                            <View style={styles.confidenceContainer}>
+                              <Text style={styles.confidenceLabel}>Confidence: </Text>
+                              <Text style={styles.confidenceValue}>
+                                {(analysisResult.confidence * 100).toFixed(1)}%
+                              </Text>
+                            </View>
+                            {analysisResult.reasoning && (
+                              <Text style={styles.reasoningText}>
+                                {analysisResult.reasoning}
+                              </Text>
+                            )}
+                          </>
+                        );
+                      } else {
+                        return (
+                          <>
+                            <Text style={[
+                              styles.diagnosisCondition,
+                              { color: prediction === 'Eczema' ? '#DC3545' : '#28A745' }
+                            ]}>
+                              {prediction === 'Eczema' ? 'Eczema Detected' : 'No Eczema Detected'}
+                            </Text>
+                            <View style={styles.confidenceContainer}>
+                              <Text style={styles.confidenceLabel}>Confidence: </Text>
+                              <Text style={styles.confidenceValue}>
+                                {(analysisResult.confidence * 100).toFixed(1)}%
+                              </Text>
+                            </View>
+                            {analysisResult.severity && prediction === 'Eczema' && (
+                              <Text style={styles.severityText}>
+                                Severity: {analysisResult.severity}
+                              </Text>
+                            )}
+                          </>
+                        );
+                      }
+                    })()}
                   </View>
                   
                   {analysisResult.explanation && (
                     <View style={styles.explanationCard}>
                       <Text style={styles.explanationTitle}>Explanation</Text>
                       <Text style={styles.explanationText}>{analysisResult.explanation}</Text>
+                    </View>
+                  )}
+                  
+                  {analysisResult.reasoning && analysisResult.prediction !== 'Uncertain' && (
+                    <View style={styles.explanationCard}>
+                      <Text style={styles.explanationTitle}>Reasoning</Text>
+                      <Text style={styles.explanationText}>{analysisResult.reasoning}</Text>
                     </View>
                   )}
                   
@@ -850,5 +905,34 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans-Regular',
     color: '#FFFFFF',
     lineHeight: 20,
+  },
+  uncertainBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 165, 0, 0.2)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  uncertainText: {
+    fontSize: 18,
+    fontFamily: 'OpenSans-Bold',
+    color: '#FFA500',
+  },
+  uncertainDescription: {
+    fontSize: 14,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  reasoningText: {
+    fontSize: 13,
+    fontFamily: 'OpenSans-Regular',
+    color: '#B0B0B0',
+    marginTop: 8,
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
 });
