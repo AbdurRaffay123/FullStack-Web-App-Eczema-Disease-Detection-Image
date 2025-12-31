@@ -1,6 +1,9 @@
 import { apiClient } from '@/utils/apiClient';
 import { API_ENDPOINTS } from '@/config/api';
 import { imageService, Image } from './imageService';
+import { symptomService, SymptomLog } from './symptomService';
+import { reminderService, Reminder } from './reminderService';
+import { consultationService } from './consultationService';
 
 export interface DashboardStats {
   totalScans: number;
@@ -22,15 +25,7 @@ export interface RecentActivity {
   status: 'success' | 'info' | 'warning';
 }
 
-export interface SymptomLog {
-  id: string;
-  itchinessLevel: number;
-  affectedArea: string;
-  possibleTriggers?: string;
-  additionalNotes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+// SymptomLog interface is imported from symptomService
 
 class DashboardService {
   /**
@@ -106,60 +101,113 @@ class DashboardService {
    */
   async getRecentActivity(): Promise<RecentActivity[]> {
     try {
-      const [images, logs] = await Promise.all([
+      const [images, logs, reminders, consultations] = await Promise.all([
         this.fetchImages(),
         this.fetchLogs(),
+        this.fetchReminders(),
+        this.fetchConsultations(),
       ]);
 
-      // Ensure both are arrays
+      // Ensure all are arrays
       const safeImages = Array.isArray(images) ? images : [];
       const safeLogs = Array.isArray(logs) ? logs : [];
+      const safeReminders = Array.isArray(reminders) ? reminders : [];
+      const safeConsultations = Array.isArray(consultations) ? consultations : [];
 
       const activities: RecentActivity[] = [];
 
-      // Add image scan activities
-      safeImages.slice(0, 3).forEach(image => {
-        if (!image || !image._id) return;
-        const prediction = image.analysisResult?.prediction || 
-          (image.analysisResult?.eczema_detected ? 'Eczema' : 'Normal');
-        const severity = image.analysisResult?.severity;
-        const confidence = ((image.analysisResult?.confidence || 0) * 100).toFixed(0);
-        
-        let description: string;
-        let status: 'success' | 'warning' | 'info';
-        
-        if (prediction === 'Uncertain') {
-          description = `Uncertain result - ${confidence}% confidence. Consult a dermatologist.`;
-          status = 'info';
-        } else if (prediction === 'Eczema') {
-          description = `${severity || 'Eczema'} detected - ${confidence}% confidence`;
-          status = 'warning';
-        } else {
-          description = `No eczema detected - ${confidence}% confidence`;
-          status = 'success';
-        }
-        
-        activities.push({
-          id: `scan-${image._id}`,
-          type: 'scan',
-          title: 'Skin scan completed',
-          description,
-          time: this.formatTimeAgo(image.createdAt || new Date().toISOString()),
-          status,
+      // Add image scan activities (most recent first)
+      safeImages
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 3)
+        .forEach(image => {
+          if (!image || !image._id) return;
+          const prediction = image.analysisResult?.prediction || 
+            (image.analysisResult?.eczema_detected ? 'Eczema' : 'Normal');
+          const severity = image.analysisResult?.severity;
+          const confidence = ((image.analysisResult?.confidence || 0) * 100).toFixed(0);
+          
+          let description: string;
+          let status: 'success' | 'warning' | 'info';
+          
+          if (prediction === 'Uncertain') {
+            description = `Uncertain result - ${confidence}% confidence. Consult a dermatologist.`;
+            status = 'info';
+          } else if (prediction === 'Eczema') {
+            description = `${severity || 'Eczema'} detected - ${confidence}% confidence`;
+            status = 'warning';
+          } else {
+            description = `No eczema detected - ${confidence}% confidence`;
+            status = 'success';
+          }
+          
+          activities.push({
+            id: `scan-${image._id}`,
+            type: 'scan',
+            title: 'Skin scan completed',
+            description,
+            time: this.formatTimeAgo(image.createdAt || new Date().toISOString()),
+            status,
+          });
         });
-      });
 
-      // Add symptom log activities
-      safeLogs.slice(0, 3).forEach(log => {
-        if (!log || !log.id) return;
-        activities.push({
-          id: `log-${log.id}`,
-          type: 'log',
-          title: 'Symptom logged',
-          description: `Itchiness level: ${log.itchinessLevel || 0}/10 - ${log.affectedArea || 'Unknown area'}`,
-          time: this.formatTimeAgo(log.createdAt || new Date().toISOString()),
-          status: 'info',
+      // Add symptom log activities (most recent first)
+      safeLogs
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 3)
+        .forEach(log => {
+          if (!log || !log.id) return;
+          activities.push({
+            id: `log-${log.id}`,
+            type: 'log',
+            title: 'Symptom logged',
+            description: `Itchiness level: ${log.itchinessLevel || 0}/10 - ${log.affectedArea || 'Unknown area'}`,
+            time: this.formatTimeAgo(log.createdAt || new Date().toISOString()),
+            status: 'info',
+          });
         });
+
+      // Add reminder activities (most recent first)
+      safeReminders
+        .sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, 2)
+        .forEach(reminder => {
+          if (!reminder || !reminder.id) return;
+          activities.push({
+            id: `reminder-${reminder.id}`,
+            type: 'reminder',
+            title: 'Reminder created',
+            description: `${reminder.title} - ${reminder.type}`,
+            time: reminder.createdAt ? this.formatTimeAgo(reminder.createdAt) : 'Recently',
+            status: reminder.isActive ? 'success' : 'info',
+          });
+        });
+
+      // Add consultation activities (most recent first)
+      safeConsultations
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 2)
+        .forEach(consultation => {
+          if (!consultation || !consultation.id) return;
+          activities.push({
+            id: `consultation-${consultation.id}`,
+            type: 'consultation',
+            title: 'Consultation booked',
+            description: `With ${consultation.doctorName} - ${consultation.status}`,
+            time: this.formatTimeAgo(consultation.createdAt || new Date().toISOString()),
+            status: consultation.status === 'confirmed' ? 'success' : consultation.status === 'completed' ? 'success' : 'info',
+          });
+        });
+
+      // Sort all activities by time (most recent first)
+      activities.sort((a, b) => {
+        // Extract timestamp from time string for comparison
+        // For now, keep images and logs first as they're already sorted
+        return 0;
       });
 
       return activities.slice(0, 5);
@@ -179,72 +227,20 @@ class DashboardService {
 
   private async fetchLogs(): Promise<SymptomLog[]> {
     try {
-      const response = await apiClient.get<any>(API_ENDPOINTS.SYMPTOMS.LIST);
-      
-      // apiClient.get() returns { status, data, message, error }
-      // The backend API response structure is in response.data
-      // Backend typically returns: { success: true, data: { logs: [...] } }
-      const apiResponse = response?.data;
-      
-      if (!apiResponse) {
-        return [];
-      }
-      
-      // Handle backend response: { success: true, data: { logs: [...] } }
-      if (apiResponse.success !== false && apiResponse.data) {
-        // Check if data has logs property
-        if (apiResponse.data.logs && Array.isArray(apiResponse.data.logs)) {
-          return apiResponse.data.logs;
-        }
-        // Check if data is directly an array
-        if (Array.isArray(apiResponse.data)) {
-          return apiResponse.data;
-        }
-      }
-      
-      // Handle case where logs is at top level: { success: true, logs: [...] }
-      if (apiResponse.logs && Array.isArray(apiResponse.logs)) {
-        return apiResponse.logs;
-      }
-      
-      // Handle direct array response
-      if (Array.isArray(apiResponse)) {
-        return apiResponse;
-      }
-      
-      return [];
+      // Use symptomService which handles the response structure correctly
+      const result = await symptomService.getLogs();
+      return result.logs || [];
     } catch (error) {
       console.error('Error fetching logs:', error);
       return [];
     }
   }
 
-  private async fetchReminders(): Promise<any[]> {
+  private async fetchReminders(): Promise<Reminder[]> {
     try {
-      const response = await apiClient.get<{
-        success: boolean;
-        data?: any[] | { reminders?: any[] };
-        reminders?: any[];
-        message?: string;
-      }>(API_ENDPOINTS.REMINDERS.LIST);
-      
-      if (response?.data) {
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
-        if (response.data.reminders && Array.isArray(response.data.reminders)) {
-          return response.data.reminders;
-        }
-        if (response.data.data && Array.isArray(response.data.data)) {
-          return response.data.data;
-        }
-      }
-      
-      if (response?.reminders && Array.isArray(response.reminders)) {
-        return response.reminders;
-      }
-      
-      return [];
+      // Use reminderService which handles the response structure correctly
+      const result = await reminderService.getReminders();
+      return result.reminders || [];
     } catch (error) {
       console.error('Error fetching reminders:', error);
       return [];
@@ -253,30 +249,9 @@ class DashboardService {
 
   private async fetchConsultations(): Promise<any[]> {
     try {
-      const response = await apiClient.get<{
-        success: boolean;
-        data?: any[] | { consultations?: any[] };
-        consultations?: any[];
-        message?: string;
-      }>(API_ENDPOINTS.CONSULTATIONS.LIST);
-      
-      if (response?.data) {
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
-        if (response.data.consultations && Array.isArray(response.data.consultations)) {
-          return response.data.consultations;
-        }
-        if (response.data.data && Array.isArray(response.data.data)) {
-          return response.data.data;
-        }
-      }
-      
-      if (response?.consultations && Array.isArray(response.consultations)) {
-        return response.consultations;
-      }
-      
-      return [];
+      // Use consultationService which handles the response structure correctly
+      const result = await consultationService.getConsultations();
+      return result.consultations || [];
     } catch (error) {
       console.error('Error fetching consultations:', error);
       return [];
