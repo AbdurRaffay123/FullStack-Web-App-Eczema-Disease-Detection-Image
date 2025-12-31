@@ -165,6 +165,61 @@ const Progress: React.FC = () => {
     }).length;
   }, [logs]);
 
+  // Calculate current streak (consecutive days with logs)
+  const currentStreak = useMemo(() => {
+    if (logs.length === 0) return 0;
+
+    // Sort logs by date (most recent first)
+    const sortedLogs = [...logs].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    let streak = 0;
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
+    for (const log of sortedLogs) {
+      const logDate = new Date(log.createdAt);
+      logDate.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.floor(
+        (currentDate.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (diffDays === streak) {
+        streak++;
+        currentDate = new Date(logDate);
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else if (diffDays > streak + 1) {
+        break;
+      }
+    }
+
+    return streak;
+  }, [logs]);
+
+  // Calculate total days logged
+  const daysLogged = useMemo(() => {
+    if (logs.length === 0) return 0;
+    
+    // Get unique dates
+    const uniqueDates = new Set<string>();
+    logs.forEach(log => {
+      const logDate = new Date(log.createdAt);
+      const dateKey = logDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      uniqueDates.add(dateKey);
+    });
+    
+    return uniqueDates.size;
+  }, [logs]);
+
+  // Calculate days logged percentage (based on selected period)
+  const daysLoggedPercentage = useMemo(() => {
+    const periodDays = parseInt(selectedPeriod, 10);
+    if (periodDays === 0) return 0;
+    return Math.round((daysLogged / periodDays) * 100);
+  }, [daysLogged, selectedPeriod]);
+
   // Analyze triggers from logs
   // Parse possibleTriggers field from logs and count occurrences
   const triggerData = useMemo(() => {
@@ -231,44 +286,89 @@ const Progress: React.FC = () => {
     return result;
   }, [filteredLogs]);
 
-  const achievements = [
-    {
-      id: '1',
-      title: '7-Day Streak',
-      description: 'Logged symptoms for 7 consecutive days',
-      icon: Calendar,
-      color: 'bg-green-500',
-      earned: true,
-      date: '2024-01-15'
-    },
-    {
-      id: '2',
-      title: 'Improvement Master',
-      description: 'Reduced average itchiness by 50%',
-      icon: TrendingUp,
-      color: 'bg-blue-500',
-      earned: true,
-      date: '2024-01-10'
-    },
-    {
-      id: '3',
-      title: 'Consistency Champion',
-      description: 'Used app for 30 consecutive days',
-      icon: Target,
-      color: 'bg-purple-500',
-      earned: false,
-      progress: 23
-    },
-    {
-      id: '4',
-      title: 'Trigger Detective',
-      description: 'Identified 5 different triggers',
-      icon: Lightbulb,
-      color: 'bg-orange-500',
-      earned: true,
-      date: '2024-01-08'
-    }
-  ];
+  // Calculate improvement percentage for achievements
+  const improvementPercent = useMemo(() => {
+    if (logs.length < 2) return 0;
+    const sortedLogs = [...logs].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const halfIndex = Math.floor(sortedLogs.length / 2);
+    const firstHalf = sortedLogs.slice(0, halfIndex);
+    const secondHalf = sortedLogs.slice(halfIndex);
+    const firstAvg = firstHalf.reduce((sum, log) => sum + log.itchinessLevel, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((sum, log) => sum + log.itchinessLevel, 0) / secondHalf.length;
+    if (firstAvg === 0) return 0;
+    return Math.round(((firstAvg - secondAvg) / firstAvg) * 100);
+  }, [logs]);
+
+  // Calculate unique triggers for achievements
+  const uniqueTriggers = useMemo(() => {
+    const triggerSet = new Set<string>();
+    logs.forEach(log => {
+      if (log.possibleTriggers) {
+        const triggers = log.possibleTriggers
+          .split(/[,;\n]/)
+          .map(t => t.trim().toLowerCase())
+          .filter(t => t.length > 0);
+        triggers.forEach(t => triggerSet.add(t));
+      }
+    });
+    return triggerSet;
+  }, [logs]);
+
+  // Calculate achievements dynamically
+  const achievements = useMemo(() => {
+    // Find date when achievement was earned (most recent log if earned)
+    const getEarnedDate = (earned: boolean) => {
+      if (!earned || logs.length === 0) return undefined;
+      return logs.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0]?.createdAt;
+    };
+
+    return [
+      {
+        id: '1',
+        title: '7-Day Streak',
+        description: 'Logged symptoms for 7 consecutive days',
+        icon: Calendar,
+        color: 'bg-green-500',
+        earned: currentStreak >= 7,
+        date: getEarnedDate(currentStreak >= 7),
+        progress: currentStreak >= 7 ? 7 : currentStreak
+      },
+      {
+        id: '2',
+        title: 'Improvement Master',
+        description: 'Reduced average itchiness by 50%',
+        icon: TrendingUp,
+        color: 'bg-blue-500',
+        earned: improvementPercent >= 50,
+        date: getEarnedDate(improvementPercent >= 50),
+        progress: improvementPercent >= 50 ? 50 : improvementPercent
+      },
+      {
+        id: '3',
+        title: 'Consistency Champion',
+        description: 'Used app for 30 consecutive days',
+        icon: Target,
+        color: 'bg-purple-500',
+        earned: currentStreak >= 30,
+        date: getEarnedDate(currentStreak >= 30),
+        progress: currentStreak >= 30 ? 30 : currentStreak
+      },
+      {
+        id: '4',
+        title: 'Trigger Detective',
+        description: 'Identified 5 different triggers',
+        icon: Lightbulb,
+        color: 'bg-orange-500',
+        earned: uniqueTriggers.size >= 5,
+        date: logs.find(log => log.possibleTriggers && uniqueTriggers.size >= 5)?.createdAt,
+        progress: uniqueTriggers.size >= 5 ? 5 : uniqueTriggers.size
+      }
+    ];
+  }, [logs, currentStreak, improvementPercent, uniqueTriggers]);
 
   // Reminder tracking data
   const reminderChartData = useMemo(() => {
@@ -371,10 +471,17 @@ const Progress: React.FC = () => {
             <div className="bg-blue-500 bg-opacity-20 p-3 rounded-lg">
               <Calendar className="h-6 w-6 text-blue-400" />
             </div>
-            <span className="text-blue-400 text-sm font-medium">7 days</span>
+            <span className="text-blue-400 text-sm font-medium">
+              {currentStreak > 0 ? `${currentStreak} day${currentStreak !== 1 ? 's' : ''}` : 'No streak'}
+            </span>
           </div>
-          <h3 className="text-2xl font-bold text-white mb-1">23</h3>
+          <h3 className="text-2xl font-bold text-white mb-1">
+            {isLoading ? '...' : currentStreak}
+          </h3>
           <p className="text-gray-300 text-sm">Current Streak</p>
+          {currentStreak === 0 && !isLoading && (
+            <p className="text-xs text-gray-400 mt-1">Start logging to build your streak!</p>
+          )}
         </div>
 
         <div className="bg-white bg-opacity-5 backdrop-blur-lg border border-white border-opacity-10 rounded-2xl p-6">
@@ -398,10 +505,17 @@ const Progress: React.FC = () => {
             <div className="bg-orange-500 bg-opacity-20 p-3 rounded-lg">
               <CheckCircle className="h-6 w-6 text-orange-400" />
             </div>
-            <span className="text-orange-400 text-sm font-medium">92%</span>
+            <span className="text-orange-400 text-sm font-medium">
+              {daysLoggedPercentage}%
+            </span>
           </div>
-          <h3 className="text-2xl font-bold text-white mb-1">28</h3>
+          <h3 className="text-2xl font-bold text-white mb-1">
+            {isLoading ? '...' : daysLogged}
+          </h3>
           <p className="text-gray-300 text-sm">Days Logged</p>
+          {filteredLogs.length === 0 && !isLoading && (
+            <p className="text-xs text-gray-400 mt-1">No logs for selected period</p>
+          )}
         </div>
       </div>
 
@@ -616,16 +730,29 @@ const Progress: React.FC = () => {
                   Earned on {new Date(achievement.date).toLocaleDateString()}
                 </p>
               )}
-              {!achievement.earned && achievement.progress && (
+              {!achievement.earned && achievement.progress !== undefined && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-gray-400 mb-1">
                     <span>Progress</span>
-                    <span>{achievement.progress}/30</span>
+                    <span>
+                      {achievement.id === '1' && `${achievement.progress}/7`}
+                      {achievement.id === '2' && `${achievement.progress}%`}
+                      {achievement.id === '3' && `${achievement.progress}/30`}
+                      {achievement.id === '4' && `${achievement.progress}/5`}
+                    </span>
                   </div>
                   <div className="w-full bg-gray-700 rounded-full h-2">
                     <div 
                       className="bg-[#6A9FB5] h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(achievement.progress / 30) * 100}%` }}
+                      style={{ 
+                        width: `${(() => {
+                          if (achievement.id === '1') return (achievement.progress / 7) * 100;
+                          if (achievement.id === '2') return Math.min((achievement.progress / 50) * 100, 100);
+                          if (achievement.id === '3') return (achievement.progress / 30) * 100;
+                          if (achievement.id === '4') return (achievement.progress / 5) * 100;
+                          return 0;
+                        })()}%` 
+                      }}
                     ></div>
                   </div>
                 </div>
