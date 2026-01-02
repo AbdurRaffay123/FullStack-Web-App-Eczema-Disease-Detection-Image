@@ -93,18 +93,25 @@ The AI model analyzed a skin image and found:
 - Prediction state: Uncertain / Other Skin Condition
 - Uncertainty reason: {uncertainty_reason or "Confidence falls in ambiguous range"}
 
+CRITICAL RESTRICTIONS:
+- DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see...")
+- DO NOT name specific objects, items, or non-skin content visible in the image
+- Focus ONLY on the eczema detection status: uncertain, may be other skin condition, or no eczema
+- Keep explanations generic and focused on eczema status only
+
 Generate a brief, user-friendly explanation (3-4 sentences) that:
-1. Explains that the image shows patterns that don't clearly match eczema or healthy skin
-2. States that the system cannot confidently classify it
+1. States that the analysis is uncertain - patterns don't clearly match eczema or healthy skin
+2. Explains that the system cannot confidently classify it as eczema or normal
 3. Mentions this may indicate a different skin condition (but DO NOT name specific diseases)
 4. Emphasizes this is NOT a medical diagnosis
 5. Strongly recommends consulting a healthcare professional
 6. Avoids giving medical advice
 7. Uses non-medical language
+8. Does NOT describe what the image actually shows or contains
 
-Example tone: "The image shows skin patterns that do not clearly match eczema or healthy skin, so the system cannot confidently classify it. This may indicate a different skin condition, but the system is only trained to detect eczema. Please consult a healthcare professional for proper evaluation."
+Example tone: "The analysis indicates uncertain results - the skin patterns do not clearly match eczema or healthy skin, so the system cannot confidently classify it. This may indicate a different skin condition, but the system is only trained to detect eczema. Please consult a healthcare professional for proper evaluation."
 
-Keep it professional, empathetic, and clear. Never name specific diseases other than eczema."""
+Keep it professional, empathetic, and clear. Never name specific diseases other than eczema. Never describe specific visual elements or objects in the image."""
         
         elif prediction_state == "Eczema" and severity:
             prompt = f"""You are a helpful AI assistant explaining skin analysis results. 
@@ -131,14 +138,22 @@ The AI model analyzed a skin image and found:
 - Eczema probability: {confidence_percent}%
 - Prediction: No eczema detected
 
+CRITICAL RESTRICTIONS:
+- DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see...")
+- DO NOT name specific objects, items, or non-skin content visible in the image
+- Focus ONLY on the eczema detection result: no eczema detected, may be other skin condition, or no disease
+- Keep explanations generic and focused on eczema status only
+
 Generate a brief, user-friendly explanation (2-3 sentences) that:
-1. Explains the result in simple terms
-2. Mentions the confidence level appropriately
+1. States that no eczema was detected (focus only on eczema status)
+2. Mentions that other skin conditions may still be present (without naming them)
 3. Emphasizes this is NOT a medical diagnosis
 4. Avoids giving medical advice
-5. Notes that other skin conditions may still be present
+5. Does NOT describe what the image actually shows or contains
 
-Keep it professional, empathetic, and clear."""
+Example: "The analysis indicates no signs of eczema were detected in this image. However, other skin conditions may still be present. This is not a medical diagnosis, and you should consult a healthcare professional for proper evaluation."
+
+Keep it professional, empathetic, and clear. Never describe specific visual elements or objects in the image."""
         
         return prompt
     
@@ -192,14 +207,21 @@ CRITICAL INSTRUCTIONS:
    - Ambiguous visual features
 3. Provide your assessment honestly
 
+IMPORTANT RESTRICTIONS FOR EXPLANATIONS:
+- DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see a...")
+- DO NOT name specific objects, items, or non-skin content visible in the image
+- Focus ONLY on whether it's: eczema, other skin condition, no disease, or uncertain
+- Keep explanations generic: "The analysis indicates..." or "The skin patterns suggest..."
+- Never describe specific visual elements that are not related to eczema detection
+
 Respond in this EXACT JSON format:
 {{
   "gemini_assessment": true/false/null,  // null if uncertain, true if eczema, false if normal
   "gemini_confidence": 0.0-1.0,          // Your confidence (lower if uncertain)
-  "explanation": "Your explanation here"  // 3-4 sentences explaining uncertainty, emphasizing NOT a diagnosis, recommending professional consultation
+  "explanation": "Your explanation here"  // 3-4 sentences. Focus only on eczema/other disease/no disease status. DO NOT describe what the image actually shows.
 }}
 
-IMPORTANT: If you're also uncertain, set gemini_assessment to null and explain why. Never name specific diseases other than eczema."""
+IMPORTANT: If you're also uncertain, set gemini_assessment to null and explain why. Never name specific diseases other than eczema. Never describe specific objects or visual elements in the image."""
             else:
                 enhanced_prompt = f"""You are analyzing a skin image for eczema detection.
 
@@ -208,17 +230,24 @@ A custom trained AI model has analyzed this image and provided:
 - Detection result: {'Eczema detected' if prediction_state == 'Eczema' else 'No eczema detected'}
 {f'- Severity: {severity}' if severity else ''}
 
-CRITICAL: The custom model may have errors. Please:
+CRITICAL INSTRUCTIONS:
 1. Analyze the image yourself carefully
 2. Look for signs of eczema: redness, inflammation, scaling, dryness, patches, irritation
 3. Provide your own assessment
 4. If patterns don't match eczema or healthy skin, indicate uncertainty
 
+IMPORTANT RESTRICTIONS FOR EXPLANATIONS:
+- If the result is NOT eczema (Normal or Uncertain), DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see a...")
+- DO NOT name specific objects, items, or non-skin content visible in the image
+- Focus ONLY on whether it's: eczema, other skin condition, no disease, or no eczema
+- Keep explanations generic: "The analysis indicates..." or "The image shows skin patterns that..."
+- Never describe specific visual elements that are not related to eczema detection
+
 Respond in this EXACT JSON format:
 {{
   "gemini_assessment": true/false/null,  // Your assessment: true if eczema, false if normal, null if uncertain
   "gemini_confidence": 0.0-1.0,          // Your confidence (0.0 to 1.0)
-  "explanation": "Your explanation here"  // 3-4 sentences describing what you see, comparing with model, emphasizing NOT a diagnosis
+  "explanation": "Your explanation here"  // 3-4 sentences. If NOT eczema, focus only on eczema/other disease/no disease status. DO NOT describe what the image actually shows.
 }}
 
 Be honest and accurate. If uncertain, set gemini_assessment to null."""
@@ -404,7 +433,7 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
         if prediction_state == "Uncertain":
             return (
                 f"The AI analysis shows an ambiguous result ({confidence_percent}% probability). "
-                f"The image shows skin patterns that do not clearly match eczema or healthy skin, "
+                f"The analysis indicates skin patterns that do not clearly match eczema or healthy skin, "
                 f"so the system cannot confidently classify it. {uncertainty_reason or 'Confidence falls in an ambiguous range.'} "
                 f"This may indicate a different skin condition, but the system is only trained to detect eczema. "
                 f"This is an AI assessment, not a medical diagnosis. Please consult a healthcare professional for proper evaluation."
@@ -433,10 +462,10 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
                 )
         else:  # Normal
             return (
-                f"The AI analysis shows a low probability ({confidence_percent}%) of eczema "
-                f"patterns. The image does not show strong indicators of eczema. "
+                f"The AI analysis indicates no eczema was detected ({confidence_percent}% probability). "
+                f"The analysis does not show strong indicators of eczema. "
                 f"However, other skin conditions may still be present. "
-                f"This is an AI assessment, not a medical diagnosis."
+                f"This is an AI assessment, not a medical diagnosis. Please consult a healthcare professional for proper evaluation."
             )
 
 
