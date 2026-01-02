@@ -25,7 +25,235 @@ Before you begin, ensure you have the following installed:
 2. **npm** (comes with Node.js)
    - Verify installation: `npm --version`
 
-3. **Expo CLI** (optional, but recommended)
+3. **Expo CLI** (optional, but recommended)You are a Principal AI Architect, ML Engineer, and MERN Stack Lead responsible for correcting real-world inference failures in a production AI system that uses a binary eczema vs normal model.
+
+Your task is to fix reliability gaps without retraining the model.
+
+📌 PROBLEM STATEMENT
+
+The current model:
+
+Is trained only on Eczema vs Normal
+
+Produces overconfident false positives for other skin diseases
+
+Rejects human face images incorrectly as “irrelevant”
+
+Performs well on validation but fails in real-world usage (OOD inputs)
+
+These issues must be resolved at inference + API + UX layers, not by retraining.
+
+🧠 CORE DESIGN PRINCIPLES (MANDATORY)
+
+Never force binary decisions when confidence is ambiguous
+
+OOD (Out-of-Distribution) inputs must be handled explicitly
+
+Human face skin is valid input
+
+Model ≠ Diagnosis
+
+Uncertainty is a first-class output
+
+✅ REQUIRED CHANGES (YOU MUST IMPLEMENT ALL)
+1️⃣ ADD A THIRD OUTPUT STATE — “UNCERTAIN / OTHER CONDITION”
+
+The system must no longer force:
+
+Eczema
+
+Normal
+
+Add a third inference state:
+
+"Uncertain / Other Skin Condition"
+
+
+This state must be triggered when:
+
+Confidence falls in a mid-range threshold
+
+Visual patterns are inconsistent
+
+Model certainty is high but feature variance is abnormal
+
+Output likely represents non-eczema dermatological conditions
+
+This state must be treated as:
+
+A safe fallback
+
+A deliberate non-decision
+
+A user-visible outcome
+
+2️⃣ CONFIDENCE-AWARE DECISION LOGIC (NO HARDCODED LABELS)
+
+Inference must follow confidence banding, not hard classification:
+
+High confidence → Allow prediction
+
+Medium confidence → Route to Uncertain
+
+Low confidence → Normal or Irrelevant
+
+The thresholds must be:
+
+Configurable
+
+Centralized
+
+Explained in comments
+
+Never hardcoded in frontend
+
+3️⃣ FIX FACE IMAGE HANDLING (CRITICAL)
+
+Human face images:
+
+ARE VALID INPUT
+
+MUST pass relevance checks
+
+MUST go through eczema inference
+
+Revise relevance logic:
+
+Reject only non-human / non-skin
+
+Accept:
+
+Face skin
+
+Arms
+
+Legs
+
+Neck
+
+Torso
+
+Relevance ≠ “eczema present”
+
+4️⃣ RESOLVE MISCLASSIFICATION OF OTHER SKIN DISEASES
+
+Since the model is binary:
+
+You must implement post-model safeguards to reduce false eczema labeling:
+
+Detect pattern mismatch
+
+Detect feature uncertainty
+
+Detect abnormally high confidence with low texture similarity
+
+Route these cases to:
+
+"Uncertain / Other Skin Condition"
+
+
+Do NOT attempt disease identification beyond eczema.
+
+5️⃣ INFERENCE PIPELINE RESTRUCTURE (STRICT ORDER)
+
+All predictions must follow this exact flow:
+
+Image validation (format, size)
+
+Human skin / face relevance check
+
+Model inference (binary)
+
+Confidence band evaluation
+
+OOD / uncertainty detection
+
+Final decision mapping
+
+Explanation generation
+
+Any failure must short-circuit safely.
+
+6️⃣ USER-VISIBLE EXPLANATION LAYER (LLM-ASSISTED)
+
+Every response must include:
+
+Clear reasoning
+
+Non-medical language
+
+Uncertainty explanation (when applicable)
+
+Example tone:
+
+“The image shows skin patterns that do not clearly match eczema or healthy skin, so the system cannot confidently classify it.”
+
+LLM must:
+
+Explain uncertainty
+
+De-risk overconfidence
+
+Avoid diagnosis
+
+Avoid naming other diseases
+
+7️⃣ API RESPONSE CONTRACT (NON-NEGOTIABLE)
+
+Final output must always contain:
+
+{
+  "relevant": true,
+  "prediction": "Eczema | Normal | Uncertain",
+  "confidence": 0.xx,
+  "reasoning": "...",
+  "disclaimer": "This is an AI-based assessment, not a medical diagnosis."
+}
+
+
+Never return raw model outputs.
+
+8️⃣ UX SAFETY RULES
+
+Never show “eczema” when confidence is ambiguous
+
+Never block valid human images
+
+Never imply medical certainty
+
+Always prefer Uncertain over wrong prediction
+
+9️⃣ ENGINEERING CONSTRAINTS
+
+No retraining
+
+No dataset changes
+
+No frontend ML logic
+
+No breaking API changes
+
+Microservice remains isolated
+
+MERN backend consumes AI results as-is
+
+🎯 FINAL GOAL
+
+Transform a binary academic model into a real-world safe AI system by:
+
+Introducing uncertainty
+
+Handling faces correctly
+
+Preventing mislabeling of other skin diseases
+
+Improving trust and UX without retraining
+
+🔚 END OF INSTRUCTIONS
+
+If you want next:
+
+I can validate Cursor’s output
    - Install globally: `npm install -g expo-cli`
    - Or use npx (no installation needed)
 
