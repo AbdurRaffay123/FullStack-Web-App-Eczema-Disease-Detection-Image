@@ -338,19 +338,6 @@ export default function AIScreen() {
                     })()}
                   </View>
                   
-                  {analysisResult.explanation && (
-                    <View style={styles.explanationCard}>
-                      <Text style={styles.explanationTitle}>Explanation</Text>
-                      <Text style={styles.explanationText}>{analysisResult.explanation}</Text>
-                    </View>
-                  )}
-                  
-                  {analysisResult.reasoning && analysisResult.prediction !== 'Uncertain' && (
-                    <View style={styles.explanationCard}>
-                      <Text style={styles.explanationTitle}>Reasoning</Text>
-                      <Text style={styles.explanationText}>{analysisResult.reasoning}</Text>
-                    </View>
-                  )}
                   
                   <View style={styles.disclaimerCard}>
                     <AlertCircle size={16} color="#FFA500" />
@@ -884,26 +871,6 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans-Regular',
     color: '#FFA500',
     textAlign: 'center',
-    lineHeight: 20,
-  },
-  explanationCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  explanationTitle: {
-    fontSize: 16,
-    fontFamily: 'OpenSans-SemiBold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  explanationText: {
-    fontSize: 14,
-    fontFamily: 'OpenSans-Regular',
-    color: '#FFFFFF',
     lineHeight: 20,
   },
   uncertainBadge: {

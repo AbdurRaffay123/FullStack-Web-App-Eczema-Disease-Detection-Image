@@ -23,6 +23,7 @@ export interface RecentActivity {
   description: string;
   time: string;
   status: 'success' | 'info' | 'warning';
+  timestamp: number; // Unix timestamp for sorting
 }
 
 // SymptomLog interface is imported from symptomService
@@ -148,6 +149,7 @@ class DashboardService {
             description,
           time: this.formatTimeAgo(image.createdAt || new Date().toISOString()),
             status,
+          timestamp: new Date(image.createdAt || new Date().toISOString()).getTime(),
         });
       });
 
@@ -164,6 +166,7 @@ class DashboardService {
           description: `Itchiness level: ${log.itchinessLevel || 0}/10 - ${log.affectedArea || 'Unknown area'}`,
           time: this.formatTimeAgo(log.createdAt || new Date().toISOString()),
           status: 'info',
+          timestamp: new Date(log.createdAt || new Date().toISOString()).getTime(),
         });
         });
 
@@ -184,6 +187,7 @@ class DashboardService {
             description: `${reminder.title} - ${reminder.type}`,
             time: reminder.createdAt ? this.formatTimeAgo(reminder.createdAt) : 'Recently',
             status: reminder.isActive ? 'success' : 'info',
+            timestamp: reminder.createdAt ? new Date(reminder.createdAt).getTime() : Date.now(),
           });
         });
 
@@ -200,15 +204,12 @@ class DashboardService {
             description: `With ${consultation.doctorName} - ${consultation.status}`,
             time: this.formatTimeAgo(consultation.createdAt || new Date().toISOString()),
             status: consultation.status === 'confirmed' ? 'success' : consultation.status === 'completed' ? 'success' : 'info',
+            timestamp: new Date(consultation.createdAt || new Date().toISOString()).getTime(),
           });
         });
 
-      // Sort all activities by time (most recent first)
-      activities.sort((a, b) => {
-        // Extract timestamp from time string for comparison
-        // For now, keep images and logs first as they're already sorted
-        return 0;
-      });
+      // Sort all activities by timestamp (most recent first - newest to oldest)
+      activities.sort((a, b) => b.timestamp - a.timestamp);
 
       return activities.slice(0, 5);
     } catch (error) {

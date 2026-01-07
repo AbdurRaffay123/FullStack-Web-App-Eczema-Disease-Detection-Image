@@ -239,11 +239,6 @@ export default function ImagesScreen() {
                             </View>
                           )}
 
-                          {image.analysisResult.explanation && (
-                            <Text style={styles.explanationText} numberOfLines={2}>
-                              {image.analysisResult.explanation}
-                            </Text>
-                          )}
                         </>
                       )}
                     </View>
@@ -427,12 +422,6 @@ const styles = StyleSheet.create({
   severityValue: {
     fontSize: 14,
     fontFamily: 'OpenSans-Bold',
-  },
-  explanationText: {
-    fontSize: 12,
-    fontFamily: 'OpenSans-Regular',
-    color: '#FFFFFF',
-    lineHeight: 18,
   },
   noAnalysisText: {
     fontSize: 14,

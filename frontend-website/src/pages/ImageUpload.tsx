@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
-import { Camera, Upload, Loader, AlertTriangle, CheckCircle, Info, Stethoscope, Lightbulb } from 'lucide-react';
+import { Camera, Upload, Loader, AlertTriangle, CheckCircle, Stethoscope, Lightbulb } from 'lucide-react';
 import { imageService, ImageAnalysisResult } from '../services/imageService';
 
 const ImageUpload: React.FC = () => {
@@ -256,15 +256,6 @@ const ImageUpload: React.FC = () => {
                 </div>
               </div>
               
-              {analysisResult.explanation && (
-                <div className="bg-white bg-opacity-5 rounded-lg p-6 border border-white border-opacity-10 mb-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <Info className="h-6 w-6 text-[#6A9FB5]" />
-                    <h3 className="text-lg font-semibold text-white">Explanation</h3>
-                  </div>
-                  <p className="text-gray-300">{analysisResult.explanation}</p>
-                </div>
-              )}
             </>
           )}
           

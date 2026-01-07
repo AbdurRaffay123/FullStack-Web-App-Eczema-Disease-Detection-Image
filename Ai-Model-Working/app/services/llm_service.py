@@ -93,25 +93,18 @@ The AI model analyzed a skin image and found:
 - Prediction state: Uncertain / Other Skin Condition
 - Uncertainty reason: {uncertainty_reason or "Confidence falls in ambiguous range"}
 
-CRITICAL RESTRICTIONS:
-- DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see...")
-- DO NOT name specific objects, items, or non-skin content visible in the image
-- Focus ONLY on the eczema detection status: uncertain, may be other skin condition, or no eczema
-- Keep explanations generic and focused on eczema status only
-
 Generate a brief, user-friendly explanation (3-4 sentences) that:
-1. States that the analysis is uncertain - patterns don't clearly match eczema or healthy skin
-2. Explains that the system cannot confidently classify it as eczema or normal
+1. Explains that the image shows patterns that don't clearly match eczema or healthy skin
+2. States that the system cannot confidently classify it
 3. Mentions this may indicate a different skin condition (but DO NOT name specific diseases)
 4. Emphasizes this is NOT a medical diagnosis
 5. Strongly recommends consulting a healthcare professional
 6. Avoids giving medical advice
 7. Uses non-medical language
-8. Does NOT describe what the image actually shows or contains
 
-Example tone: "The analysis indicates uncertain results - the skin patterns do not clearly match eczema or healthy skin, so the system cannot confidently classify it. This may indicate a different skin condition, but the system is only trained to detect eczema. Please consult a healthcare professional for proper evaluation."
+Example tone: "The image shows skin patterns that do not clearly match eczema or healthy skin, so the system cannot confidently classify it. This may indicate a different skin condition, but the system is only trained to detect eczema. Please consult a healthcare professional for proper evaluation."
 
-Keep it professional, empathetic, and clear. Never name specific diseases other than eczema. Never describe specific visual elements or objects in the image."""
+Keep it professional, empathetic, and clear. Never name specific diseases other than eczema."""
         
         elif prediction_state == "Eczema" and severity:
             prompt = f"""You are a helpful AI assistant explaining skin analysis results. 
@@ -138,22 +131,14 @@ The AI model analyzed a skin image and found:
 - Eczema probability: {confidence_percent}%
 - Prediction: No eczema detected
 
-CRITICAL RESTRICTIONS:
-- DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see...")
-- DO NOT name specific objects, items, or non-skin content visible in the image
-- Focus ONLY on the eczema detection result: no eczema detected, may be other skin condition, or no disease
-- Keep explanations generic and focused on eczema status only
-
 Generate a brief, user-friendly explanation (2-3 sentences) that:
-1. States that no eczema was detected (focus only on eczema status)
-2. Mentions that other skin conditions may still be present (without naming them)
+1. Explains the result in simple terms
+2. Mentions the confidence level appropriately
 3. Emphasizes this is NOT a medical diagnosis
 4. Avoids giving medical advice
-5. Does NOT describe what the image actually shows or contains
+5. Notes that other skin conditions may still be present
 
-Example: "The analysis indicates no signs of eczema were detected in this image. However, other skin conditions may still be present. This is not a medical diagnosis, and you should consult a healthcare professional for proper evaluation."
-
-Keep it professional, empathetic, and clear. Never describe specific visual elements or objects in the image."""
+Keep it professional, empathetic, and clear."""
         
         return prompt
     
@@ -192,65 +177,110 @@ Keep it professional, empathetic, and clear. Never describe specific visual elem
             # Enhanced prompt that asks Gemini to analyze the image AND provide its assessment
             # Updated to handle uncertainty state
             if prediction_state == "Uncertain":
-                enhanced_prompt = f"""You are analyzing a skin image for eczema detection.
+                enhanced_prompt = f"""You are a dermatology AI assistant. The model is uncertain about this image.
 
-A custom trained AI model has analyzed this image and provided:
+MODEL ANALYSIS:
 - Eczema probability: {int(eczema_probability * 100)}%
-- Prediction state: Uncertain / Other Skin Condition
-- Uncertainty reason: {uncertainty_reason or "Confidence falls in ambiguous range"}
+- Status: Uncertain
+- Reason: {uncertainty_reason or "Confidence in ambiguous range"}
 
-CRITICAL INSTRUCTIONS:
-1. Analyze the image yourself carefully
-2. The model is uncertain - this may indicate:
-   - Patterns don't clearly match eczema or healthy skin
-   - Possible different skin condition (DO NOT name specific diseases)
-   - Ambiguous visual features
-3. Provide your assessment honestly
+PERFORM A TWO-STAGE ANALYSIS:
 
-IMPORTANT RESTRICTIONS FOR EXPLANATIONS:
-- DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see a...")
-- DO NOT name specific objects, items, or non-skin content visible in the image
-- Focus ONLY on whether it's: eczema, other skin condition, no disease, or uncertain
-- Keep explanations generic: "The analysis indicates..." or "The skin patterns suggest..."
-- Never describe specific visual elements that are not related to eczema detection
+**STAGE 1: Is this skin PATHOLOGICALLY abnormal?**
+HEALTHY skin (return FALSE):
+✓ Uniform skin tone, smooth texture
+✓ Natural variations (freckles, moles, minor redness)
+✓ No visible lesions, patches, or inflammation
 
-Respond in this EXACT JSON format:
+DISEASED skin (proceed to Stage 2):
+✗ Visible rash, lesions, or abnormal patches
+✗ Scaling, crusting, or flaking
+✗ Obvious inflammation or skin damage
+
+**STAGE 2: If abnormal, is it ECZEMA?**
+ECZEMA signs (return TRUE):
+• Red, inflamed patches with scaling/dryness
+• Visible scratch damage or lichenification
+• Vesicles, crusting, or weeping areas
+• Located in typical areas (folds, hands, face)
+
+NOT eczema (return FALSE):
+• Psoriasis (silvery scales, sharp borders)
+• Ringworm (ring pattern)
+• Healthy skin
+
+DECISION RULES:
+1. Healthy skin → FALSE
+2. Clear eczema → TRUE
+3. Other skin condition → FALSE
+4. Cannot determine → null
+
+IMPORTANT: Normal skin is NOT eczema. Only TRUE if clear pathological eczema signs.
+
+JSON response:
 {{
-  "gemini_assessment": true/false/null,  // null if uncertain, true if eczema, false if normal
-  "gemini_confidence": 0.0-1.0,          // Your confidence (lower if uncertain)
-  "explanation": "Your explanation here"  // 3-4 sentences. Focus only on eczema/other disease/no disease status. DO NOT describe what the image actually shows.
-}}
-
-IMPORTANT: If you're also uncertain, set gemini_assessment to null and explain why. Never name specific diseases other than eczema. Never describe specific objects or visual elements in the image."""
+  "gemini_assessment": true/false/null,
+  "gemini_confidence": 0.0-1.0,
+  "explanation": "2-3 sentences. Recommend dermatologist consultation. NOT a diagnosis."
+}}"""
             else:
-                enhanced_prompt = f"""You are analyzing a skin image for eczema detection.
+                enhanced_prompt = f"""You are a dermatology AI assistant performing eczema detection.
 
-A custom trained AI model has analyzed this image and provided:
-- Eczema probability: {int(eczema_probability * 100)}%
-- Detection result: {'Eczema detected' if prediction_state == 'Eczema' else 'No eczema detected'}
-{f'- Severity: {severity}' if severity else ''}
+MODEL ANALYSIS:
+- Eczema probability from trained model: {int(eczema_probability * 100)}%
+- Model result: {'Eczema detected' if prediction_state == 'Eczema' else 'No eczema detected'}
+{f'- Estimated severity: {severity}' if severity else ''}
 
-CRITICAL INSTRUCTIONS:
-1. Analyze the image yourself carefully
-2. Look for signs of eczema: redness, inflammation, scaling, dryness, patches, irritation
-3. Provide your own assessment
-4. If patterns don't match eczema or healthy skin, indicate uncertainty
+PERFORM A TWO-STAGE ANALYSIS:
 
-IMPORTANT RESTRICTIONS FOR EXPLANATIONS:
-- If the result is NOT eczema (Normal or Uncertain), DO NOT mention what the image actually shows (e.g., "this is a photo of...", "the image contains...", "I can see a...")
-- DO NOT name specific objects, items, or non-skin content visible in the image
-- Focus ONLY on whether it's: eczema, other skin condition, no disease, or no eczema
-- Keep explanations generic: "The analysis indicates..." or "The image shows skin patterns that..."
-- Never describe specific visual elements that are not related to eczema detection
+**STAGE 1: Is this skin PATHOLOGICALLY abnormal?**
+HEALTHY skin (return FALSE):
+✓ Uniform skin tone (even if naturally darker or lighter)
+✓ Smooth texture without lesions
+✓ Natural skin variations (freckles, moles, beauty marks)
+✓ Minor temporary redness (from pressure, temperature, or emotion)
+✓ Normal skin folds and creases
+✓ No visible inflammation, scaling, or patches
 
-Respond in this EXACT JSON format:
+DISEASED skin (proceed to Stage 2):
+✗ Visible rash, lesions, or abnormal patches
+✗ Significant inflammation or swelling
+✗ Scaling, crusting, or flaking skin
+✗ Visible scratch marks or excoriations
+✗ Oozing, weeping, or blistering areas
+✗ Obvious skin discoloration beyond natural variation
+
+**STAGE 2: If abnormal, is it ECZEMA specifically?**
+ECZEMA characteristics (return TRUE):
+• Red, inflamed patches (especially in skin folds, hands, face)
+• Dry, scaly, or flaky skin patches
+• Visible itching damage (scratch marks, raw areas)
+• Lichenification (thickened, leathery skin from chronic scratching)
+• Vesicles or small fluid-filled bumps
+• Crusted or weeping areas from scratching
+• Symmetric distribution (often affects both sides)
+
+NOT ECZEMA - other conditions (return FALSE):
+• Psoriasis: Silvery-white scales, sharply defined borders
+• Ringworm: Clear ring-shaped pattern with central clearing
+• Acne: Pimples, blackheads, whiteheads on face/back
+• Sunburn: Uniform redness matching sun exposure
+• Healthy skin with natural variations
+
+DECISION RULES:
+1. Healthy/normal skin → FALSE (confidence 0.8-0.95)
+2. Clear eczema signs (inflammation + scaling/itching damage) → TRUE (confidence 0.7-0.95)
+3. Skin condition but NOT eczema → FALSE (confidence 0.6-0.8)
+4. Ambiguous/unclear → null (confidence 0.3-0.5)
+
+IMPORTANT: Do NOT over-diagnose. Normal skin variations are NOT eczema.
+
+Respond in EXACT JSON:
 {{
-  "gemini_assessment": true/false/null,  // Your assessment: true if eczema, false if normal, null if uncertain
-  "gemini_confidence": 0.0-1.0,          // Your confidence (0.0 to 1.0)
-  "explanation": "Your explanation here"  // 3-4 sentences. If NOT eczema, focus only on eczema/other disease/no disease status. DO NOT describe what the image actually shows.
-}}
-
-Be honest and accurate. If uncertain, set gemini_assessment to null."""
+  "gemini_assessment": true/false/null,
+  "gemini_confidence": 0.0-1.0,
+  "explanation": "2-3 sentences. State what you observe and why. This is NOT a medical diagnosis."
+}}"""
             
             headers = {
                 "x-goog-api-key": self.api_key,
@@ -291,6 +321,19 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
             response.raise_for_status()
             result = response.json()
             
+            # ============================================
+            # GEMINI API RAW RESPONSE LOGGING
+            # ============================================
+            print("\n" + "-"*60)
+            print("📡 GEMINI API RAW RESPONSE")
+            print("-"*60)
+            print(f"🔗 API URL: {api_url}")
+            print(f"📦 Response Status: {response.status_code}")
+            print(f"📄 Response Keys: {list(result.keys())}")
+            if "candidates" in result:
+                print(f"📋 Candidates Count: {len(result['candidates'])}")
+            print("-"*60)
+            
             # Extract the explanation from Gemini API response
             if "candidates" in result and len(result["candidates"]) > 0:
                 candidate = result["candidates"][0]
@@ -298,6 +341,13 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
                     parts = candidate["content"]["parts"]
                     if len(parts) > 0 and "text" in parts[0]:
                         gemini_text = parts[0]["text"].strip()
+                        
+                        print("\n" + "-"*60)
+                        print("📝 GEMINI RAW TEXT RESPONSE")
+                        print("-"*60)
+                        print(f"📄 Full Text Length: {len(gemini_text)} characters")
+                        print(f"📄 Text Preview: {gemini_text[:300]}..." if len(gemini_text) > 300 else f"📄 Full Text: {gemini_text}")
+                        print("-"*60 + "\n")
                         
                         # Try to parse JSON response
                         try:
@@ -314,6 +364,15 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
                                     gemini_assessment = bool(gemini_assessment_raw)
                                 gemini_confidence = gemini_json.get("gemini_confidence")
                                 explanation = gemini_json.get("explanation", gemini_text)
+                                
+                                print("\n" + "-"*60)
+                                print("✅ GEMINI PARSED JSON RESPONSE")
+                                print("-"*60)
+                                print(f"🎯 Assessment: {gemini_assessment}")
+                                print(f"📊 Confidence: {gemini_confidence}")
+                                print(f"💬 Explanation Length: {len(explanation)} characters")
+                                print(f"📋 Full JSON: {gemini_json}")
+                                print("-"*60 + "\n")
                                 
                                 return (explanation, gemini_assessment, gemini_confidence)
                         except:
@@ -433,7 +492,7 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
         if prediction_state == "Uncertain":
             return (
                 f"The AI analysis shows an ambiguous result ({confidence_percent}% probability). "
-                f"The analysis indicates skin patterns that do not clearly match eczema or healthy skin, "
+                f"The image shows skin patterns that do not clearly match eczema or healthy skin, "
                 f"so the system cannot confidently classify it. {uncertainty_reason or 'Confidence falls in an ambiguous range.'} "
                 f"This may indicate a different skin condition, but the system is only trained to detect eczema. "
                 f"This is an AI assessment, not a medical diagnosis. Please consult a healthcare professional for proper evaluation."
@@ -462,10 +521,10 @@ Be honest and accurate. If uncertain, set gemini_assessment to null."""
                 )
         else:  # Normal
             return (
-                f"The AI analysis indicates no eczema was detected ({confidence_percent}% probability). "
-                f"The analysis does not show strong indicators of eczema. "
+                f"The AI analysis shows a low probability ({confidence_percent}%) of eczema "
+                f"patterns. The image does not show strong indicators of eczema. "
                 f"However, other skin conditions may still be present. "
-                f"This is an AI assessment, not a medical diagnosis. Please consult a healthcare professional for proper evaluation."
+                f"This is an AI assessment, not a medical diagnosis."
             )
 
 

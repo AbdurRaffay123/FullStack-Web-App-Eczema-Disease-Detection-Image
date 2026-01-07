@@ -23,17 +23,23 @@ class UncertaintyDetector:
     def __init__(self):
         # Confidence banding thresholds (configurable via environment)
         # These define when to route to "Uncertain" state
-        self.high_confidence_threshold = float(os.getenv("HIGH_CONFIDENCE_THRESHOLD", "0.75"))
-        self.low_confidence_threshold = float(os.getenv("LOW_CONFIDENCE_THRESHOLD", "0.25"))
-        self.uncertainty_band_lower = float(os.getenv("UNCERTAINTY_BAND_LOWER", "0.35"))
-        self.uncertainty_band_upper = float(os.getenv("UNCERTAINTY_BAND_UPPER", "0.65"))
+        # RELAXED: Lower high threshold to trust model more
+        self.high_confidence_threshold = float(os.getenv("HIGH_CONFIDENCE_THRESHOLD", "0.60"))  # Was 0.75
+        self.low_confidence_threshold = float(os.getenv("LOW_CONFIDENCE_THRESHOLD", "0.40"))    # Was 0.25
+        self.uncertainty_band_lower = float(os.getenv("UNCERTAINTY_BAND_LOWER", "0.40"))        # Was 0.35
+        self.uncertainty_band_upper = float(os.getenv("UNCERTAINTY_BAND_UPPER", "0.60"))        # Was 0.65
         
         # Feature variance thresholds for OOD detection
-        self.texture_variance_threshold_low = float(os.getenv("TEXTURE_VARIANCE_LOW", "50.0"))
-        self.texture_variance_threshold_high = float(os.getenv("TEXTURE_VARIANCE_HIGH", "2000.0"))
+        # RELAXED: Wider acceptable range
+        self.texture_variance_threshold_low = float(os.getenv("TEXTURE_VARIANCE_LOW", "10.0"))   # Was 50.0
+        self.texture_variance_threshold_high = float(os.getenv("TEXTURE_VARIANCE_HIGH", "5000.0"))  # Was 2000.0
         
         # Pattern mismatch detection thresholds
-        self.confidence_texture_mismatch_threshold = float(os.getenv("CONFIDENCE_TEXTURE_MISMATCH", "0.3"))
+        # RELAXED: Higher threshold means less sensitive to mismatches
+        self.confidence_texture_mismatch_threshold = float(os.getenv("CONFIDENCE_TEXTURE_MISMATCH", "0.15"))  # Was 0.3
+        
+        # Minimum factors required to trigger uncertainty
+        self.min_uncertainty_factors = int(os.getenv("MIN_UNCERTAINTY_FACTORS", "2"))  # NEW: Require multiple factors
     
     async def evaluate_uncertainty(
         self,
@@ -102,32 +108,66 @@ class UncertaintyDetector:
             # Check if visual features align with confidence level
             feature_consistency = self._check_feature_consistency(bgr_image, eczema_probability)
             
-            # Decision Logic: Route to Uncertain if ANY of these conditions are met
-            uncertainty_reasons = []
+            # Decision Logic: Route to Uncertain only if MULTIPLE conditions are met
+            # This prevents over-aggressive uncertainty detection
+            uncertainty_factors = []
             
+            # Factor weights (higher = more significant)
             if confidence_in_uncertainty_band:
-                uncertainty_reasons.append("confidence falls in ambiguous range")
+                uncertainty_factors.append(("confidence falls in ambiguous range", 2))  # Weight 2 - very significant
             
             if abnormal_variance:
-                uncertainty_reasons.append("texture patterns are inconsistent with training data")
+                uncertainty_factors.append(("texture patterns are inconsistent", 1))  # Weight 1
             
             if pattern_mismatch:
-                uncertainty_reasons.append("high confidence but visual patterns don't match eczema characteristics")
+                uncertainty_factors.append(("visual patterns don't match eczema", 1))  # Weight 1
             
             if not feature_consistency:
-                uncertainty_reasons.append("visual features are inconsistent with prediction confidence")
+                uncertainty_factors.append(("visual features inconsistent with confidence", 1))  # Weight 1
             
-            # If any uncertainty indicators are present, route to Uncertain state
-            is_uncertain = len(uncertainty_reasons) > 0
+            # Calculate total weight
+            total_weight = sum(weight for _, weight in uncertainty_factors)
+            uncertainty_reasons = [reason for reason, _ in uncertainty_factors]
             
-            if is_uncertain:
-                reason = f"Uncertain classification: {', '.join(uncertainty_reasons)}. " + \
-                        "The image may show a different skin condition or the patterns are ambiguous."
-                # Adjust confidence to mid-range for uncertain cases
-                adjusted_confidence = 0.5
-            else:
+            # CRITICAL: Only route to Uncertain if:
+            # 1. Confidence is truly in the ambiguous band (0.40-0.60), OR
+            # 2. Multiple other factors present (total weight >= min_uncertainty_factors)
+            # 
+            # HIGH CONFIDENCE (>= 0.60) should NOT be easily overridden
+            is_in_ambiguous_band = self.uncertainty_band_lower <= eczema_probability <= self.uncertainty_band_upper
+            has_multiple_issues = total_weight >= self.min_uncertainty_factors
+            
+            # If confidence is HIGH (>= 0.60), don't mark as uncertain unless there are severe issues
+            if eczema_probability >= self.high_confidence_threshold:
+                # High confidence - trust the model, don't mark uncertain
+                is_uncertain = False
                 reason = ""
                 adjusted_confidence = eczema_probability
+            elif eczema_probability <= self.low_confidence_threshold:
+                # Low confidence - this is "Normal", don't mark uncertain
+                is_uncertain = False
+                reason = ""
+                adjusted_confidence = eczema_probability
+            elif is_in_ambiguous_band and has_multiple_issues:
+                # Truly ambiguous: in mid-range AND has multiple issues
+                is_uncertain = True
+                reason = f"Uncertain classification: {', '.join(uncertainty_reasons)}. " + \
+                        "The image may show a different skin condition or the patterns are ambiguous."
+                adjusted_confidence = 0.5
+            else:
+                # Not enough evidence for uncertainty - trust the model
+                is_uncertain = False
+                reason = ""
+                adjusted_confidence = eczema_probability
+            
+            # Log uncertainty evaluation
+            print(f"\n📊 Uncertainty Evaluation:")
+            print(f"   Eczema Probability: {eczema_probability:.4f}")
+            print(f"   In Ambiguous Band (0.40-0.60): {is_in_ambiguous_band}")
+            print(f"   Uncertainty Factors: {len(uncertainty_factors)} (weight: {total_weight})")
+            print(f"   Factors: {uncertainty_reasons if uncertainty_reasons else 'None'}")
+            print(f"   Is Uncertain: {is_uncertain}")
+            print(f"   Adjusted Confidence: {adjusted_confidence:.4f}\n")
             
             return is_uncertain, reason, adjusted_confidence
         

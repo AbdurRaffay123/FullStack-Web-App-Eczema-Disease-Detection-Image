@@ -174,11 +174,6 @@ const ImageHistory: React.FC = () => {
                           </div>
                         )}
 
-                        {image.analysisResult.explanation && (
-                          <p className="text-gray-300 text-sm line-clamp-2">
-                            {image.analysisResult.explanation}
-                          </p>
-                        )}
                       </>
                     )}
                   </div>
@@ -197,6 +192,8 @@ const ImageHistory: React.FC = () => {
 };
 
 export default ImageHistory;
+
+
 
 
 

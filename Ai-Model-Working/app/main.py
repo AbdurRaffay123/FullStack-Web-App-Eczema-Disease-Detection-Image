@@ -180,6 +180,16 @@ async def analyze_image(file: UploadFile = File(...)):
         eczema_probability = float(prediction_result["eczema_probability"])
         
         # ============================================
+        # MODEL OUTPUT LOGGING
+        # ============================================
+        print("\n" + "="*60)
+        print("🤖 MODEL OUTPUT")
+        print("="*60)
+        print(f"📊 Eczema Probability: {eczema_probability:.4f} ({eczema_probability*100:.2f}%)")
+        print(f"📋 Raw Prediction Result: {prediction_result}")
+        print("="*60 + "\n")
+        
+        # ============================================
         # STEP 4: Confidence Band Evaluation
         # ============================================
         confidence_band = uncertainty_detector.get_confidence_band(eczema_probability)
@@ -240,24 +250,82 @@ async def analyze_image(file: UploadFile = File(...)):
             uncertainty_reason=uncertainty_reason if prediction_state == "Uncertain" else None
         )
         
-        # Optional: Use Gemini's assessment to refine prediction (if available and not uncertain)
-        # Only refine if Gemini provides clear assessment and we're not already uncertain
-        if gemini_assessment is not None and prediction_state != "Uncertain":
-            # If Gemini is uncertain (None), keep our prediction
-            # If Gemini disagrees strongly, consider adjusting
-            if prediction_state == "Eczema" and not gemini_assessment:
-                # Model says eczema but Gemini says no - reduce confidence but don't change to Uncertain
-                # (already passed uncertainty check)
-                if gemini_confidence and gemini_confidence < 0.3:
-                    # Strong disagreement - route to Uncertain
-                    prediction_state = "Uncertain"
-                    final_confidence = 0.5
+        # ============================================
+        # GEMINI OUTPUT LOGGING
+        # ============================================
+        print("\n" + "="*60)
+        print("🧠 GEMINI OUTPUT")
+        print("="*60)
+        print(f"🔍 Gemini Assessment: {gemini_assessment}")
+        print(f"📊 Gemini Confidence: {gemini_confidence}")
+        print(f"💬 Explanation: {explanation[:200]}..." if explanation and len(explanation) > 200 else f"💬 Explanation: {explanation}")
+        print("="*60 + "\n")
+        
+        # ============================================
+        # GEMINI OVERRIDE LOGIC
+        # Trust Gemini for distinguishing eczema from OTHER skin conditions
+        # The model was trained on eczema vs healthy skin, so it may misclassify
+        # other skin diseases as eczema. Gemini helps correct this.
+        # ============================================
+        
+        if gemini_assessment is not None:
+            # ============================================
+            # SMART OVERRIDE LOGIC
+            # Combines model probability with Gemini's visual analysis
+            # ============================================
+            
+            print(f"\n📊 DECISION INPUTS:")
+            print(f"   Model probability: {eczema_probability:.2%}")
+            print(f"   Model state: {prediction_state}")
+            print(f"   Gemini assessment: {'Eczema' if gemini_assessment else 'Not Eczema'}")
+            print(f"   Gemini confidence: {gemini_confidence:.2f}" if gemini_confidence else "   Gemini confidence: N/A")
+            
+            # CASE 1: Model says Eczema (>=60% probability)
+            if prediction_state == "Eczema":
+                # Trust the model - it was trained specifically for this
+                # Only override if Gemini is VERY confident it's not eczema (rare)
+                if gemini_assessment == False and gemini_confidence and gemini_confidence >= 0.9:
+                    print("\n⚠️ GEMINI OVERRIDE: Model detected eczema but Gemini very confident it's not")
+                    prediction_state = "Normal"
+                    final_confidence = gemini_confidence
                     final_eczema_detected = False
                     severity = None
-                    uncertainty_reason = "Model and vision analysis disagree significantly."
-            elif prediction_state == "Normal" and gemini_assessment:
-                # Model says normal but Gemini sees eczema - trust Gemini more
-                if gemini_confidence and gemini_confidence > 0.6:
+                # Otherwise, keep the model's Eczema prediction
+                    
+            # CASE 2: Model says Normal (<40% probability)
+            elif prediction_state == "Normal":
+                # Model thinks it's normal, but check if Gemini sees eczema
+                if gemini_assessment == True:
+                    # Gemini detected eczema - but only trust if VERY confident
+                    # and model probability wasn't extremely low
+                    if gemini_confidence and gemini_confidence >= 0.75 and eczema_probability >= 0.20:
+                        print("\n✅ GEMINI DETECTED ECZEMA (model gave low probability)")
+                        print(f"   Model: {eczema_probability:.2%}, Gemini: {gemini_confidence:.2%}")
+                        prediction_state = "Eczema"
+                        final_confidence = gemini_confidence
+                        final_eczema_detected = True
+                        severity = await severity_estimator.estimate_severity(
+                            processed_image,
+                            gemini_confidence,
+                            {"eczema_probability": gemini_confidence}
+                        )
+                    elif gemini_confidence and gemini_confidence >= 0.85:
+                        # Very high Gemini confidence, even if model was very low
+                        print("\n✅ GEMINI DETECTED ECZEMA (high confidence override)")
+                        prediction_state = "Eczema"
+                        final_confidence = gemini_confidence
+                        final_eczema_detected = True
+                        severity = await severity_estimator.estimate_severity(
+                            processed_image,
+                            gemini_confidence,
+                            {"eczema_probability": gemini_confidence}
+                        )
+                # If Gemini also says normal (False), keep Normal
+                    
+            # CASE 3: Model is Uncertain (40-60% probability)
+            elif prediction_state == "Uncertain":
+                if gemini_assessment == True and gemini_confidence and gemini_confidence >= 0.70:
+                    print("\n✅ GEMINI RESOLVED UNCERTAINTY: Detected eczema")
                     prediction_state = "Eczema"
                     final_confidence = gemini_confidence
                     final_eczema_detected = True
@@ -266,19 +334,51 @@ async def analyze_image(file: UploadFile = File(...)):
                         gemini_confidence,
                         {"eczema_probability": gemini_confidence}
                     )
+                elif gemini_assessment == False and gemini_confidence and gemini_confidence >= 0.70:
+                    print("\n✅ GEMINI RESOLVED UNCERTAINTY: Not eczema")
+                    prediction_state = "Normal"
+                    final_confidence = gemini_confidence
+                    final_eczema_detected = False
+                    severity = None
         
         # Build reasoning string
         reasoning_parts = []
-        if prediction_state == "Uncertain":
+        
+        # Check if Gemini overrode the model
+        gemini_overrode = gemini_assessment is not None and (
+            (gemini_assessment == False and eczema_probability >= 0.6) or  # Model said eczema, Gemini said no
+            (gemini_assessment == True and eczema_probability <= 0.4)      # Model said normal, Gemini said yes
+        )
+        
+        if gemini_overrode:
+            if prediction_state == "Normal" and gemini_assessment == False:
+                reasoning_parts.append("Vision analysis indicates this is NOT eczema.")
+                reasoning_parts.append("The image may show a different skin condition or healthy skin.")
+            elif prediction_state == "Eczema" and gemini_assessment == True:
+                reasoning_parts.append("Vision analysis confirmed eczema detection.")
+        elif prediction_state == "Uncertain":
             reasoning_parts.append(f"Uncertainty detected: {uncertainty_reason or 'Confidence in ambiguous range'}.")
         else:
             reasoning_parts.append(f"Confidence band: {confidence_band}.")
             if prediction_state == "Eczema":
                 reasoning_parts.append(f"High confidence eczema detection ({int(final_confidence * 100)}%).")
             else:
-                reasoning_parts.append(f"High confidence no eczema ({int(final_confidence * 100)}%).")
+                reasoning_parts.append(f"No eczema detected ({int(final_confidence * 100)}% confidence).")
         
         reasoning = " ".join(reasoning_parts)
+        
+        # ============================================
+        # FINAL DECISION LOGGING
+        # ============================================
+        print("\n" + "="*60)
+        print("✅ FINAL DECISION")
+        print("="*60)
+        print(f"🎯 Prediction State: {prediction_state}")
+        print(f"📊 Final Confidence: {final_confidence:.4f} ({final_confidence*100:.2f}%)")
+        print(f"🔴 Eczema Detected: {final_eczema_detected}")
+        print(f"📈 Severity: {severity if severity else 'N/A'}")
+        print(f"💭 Reasoning: {reasoning[:150]}..." if len(reasoning) > 150 else f"💭 Reasoning: {reasoning}")
+        print("="*60 + "\n")
         
         # ============================================
         # Build Final Response
