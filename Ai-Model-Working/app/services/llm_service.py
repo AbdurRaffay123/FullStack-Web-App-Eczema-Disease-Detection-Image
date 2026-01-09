@@ -14,16 +14,16 @@ class LLMService:
     Service for generating human-friendly explanations using Official Google Gemini API
     API Key from: https://aistudio.google.com/app
     
-    Supported models (from Google AI Studio - instruction-tuned versions):
-    - gemma-3-27b-it (default - higher rate limits, 0/30 used)
-    - gemma-3-12b-it (alternative)
-    - gemma-3-4b-it (smaller, faster)
-    - gemma-3-2b-it (smallest)
-    - gemma-3-1b-it (tiny)
-    - gemini-2.5-flash (alternative, may have rate limits)
+    Supported models with VISION capabilities (for image analysis):
+    - gemini-1.5-pro (BEST for accuracy - recommended for medical image analysis) ⭐ RECOMMENDED
+    - gemini-1.5-flash (FAST - good balance of speed and accuracy)
+    - gemini-2.0-flash-exp (Latest experimental - best performance, may have rate limits)
+    
+    NOTE: Gemma models (gemma-3-27b-it, etc.) are TEXT-ONLY and do NOT support vision/image analysis!
+    For medical image analysis, gemini-1.5-pro provides the best accuracy.
     """
     
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemma-3-27b-it"):
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-1.5-pro"):
         # Get API key from environment variable (official Google Gemini API key from AI Studio)
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.model_name = model_name
@@ -310,15 +310,53 @@ Respond in EXACT JSON:
                 }
             }
             
-            # Call Google Gemini API with vision
+            # Call Google Gemini API with vision (with retry logic for 503 errors)
             api_url = f"{self.base_url}/models/{self.model_name}:generateContent"
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=payload,
-                timeout=30
-            )
-            response.raise_for_status()
+            
+            # Retry logic for 503 (overloaded) errors
+            max_retries = 3
+            retry_delay = 2  # seconds
+            import asyncio
+            response = None
+            
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        api_url,
+                        headers=headers,
+                        json=payload,
+                        timeout=30
+                    )
+                    
+                    # If 503 error, retry with exponential backoff
+                    if response.status_code == 503 and attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)  # Exponential backoff: 2s, 4s, 8s
+                        print(f"⚠️ Gemini API overloaded (503). Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    
+                    response.raise_for_status()
+                    break  # Success, exit retry loop
+                    
+                except requests.exceptions.HTTPError as e:
+                    if hasattr(e, 'response') and e.response and e.response.status_code == 503 and attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        print(f"⚠️ Gemini API overloaded (503). Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        raise  # Re-raise if not 503 or last attempt
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        print(f"⚠️ Gemini API error: {str(e)}. Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        raise
+            
+            if not response or response.status_code == 503:
+                raise requests.exceptions.HTTPError(f"Gemini API still overloaded after {max_retries} attempts")
+            
             result = response.json()
             
             # ============================================

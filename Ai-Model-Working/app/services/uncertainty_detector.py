@@ -23,11 +23,12 @@ class UncertaintyDetector:
     def __init__(self):
         # Confidence banding thresholds (configurable via environment)
         # These define when to route to "Uncertain" state
-        # RELAXED: Lower high threshold to trust model more
-        self.high_confidence_threshold = float(os.getenv("HIGH_CONFIDENCE_THRESHOLD", "0.60"))  # Was 0.75
-        self.low_confidence_threshold = float(os.getenv("LOW_CONFIDENCE_THRESHOLD", "0.40"))    # Was 0.25
-        self.uncertainty_band_lower = float(os.getenv("UNCERTAINTY_BAND_LOWER", "0.40"))        # Was 0.35
-        self.uncertainty_band_upper = float(os.getenv("UNCERTAINTY_BAND_UPPER", "0.60"))        # Was 0.65
+        # ADJUSTED: More sensitive to eczema - lower threshold to catch more eczema cases
+        # We want to catch eczema even at moderate probabilities (35%+)
+        self.high_confidence_threshold = float(os.getenv("HIGH_CONFIDENCE_THRESHOLD", "0.35"))  # >=35% = Eczema (was 0.60)
+        self.low_confidence_threshold = float(os.getenv("LOW_CONFIDENCE_THRESHOLD", "0.20"))    # <=20% = Normal (was 0.30)
+        self.uncertainty_band_lower = float(os.getenv("UNCERTAINTY_BAND_LOWER", "0.20"))        # 20-35% = Uncertain (was 0.30)
+        self.uncertainty_band_upper = float(os.getenv("UNCERTAINTY_BAND_UPPER", "0.35"))        # Was 0.60
         
         # Feature variance thresholds for OOD detection
         # RELAXED: Wider acceptable range
@@ -39,7 +40,8 @@ class UncertaintyDetector:
         self.confidence_texture_mismatch_threshold = float(os.getenv("CONFIDENCE_TEXTURE_MISMATCH", "0.15"))  # Was 0.3
         
         # Minimum factors required to trigger uncertainty
-        self.min_uncertainty_factors = int(os.getenv("MIN_UNCERTAINTY_FACTORS", "2"))  # NEW: Require multiple factors
+        # INCREASED: Require more factors to avoid false uncertainty for eczema cases
+        self.min_uncertainty_factors = int(os.getenv("MIN_UNCERTAINTY_FACTORS", "3"))  # Was 2, now 3 to be less aggressive
     
     async def evaluate_uncertainty(
         self,

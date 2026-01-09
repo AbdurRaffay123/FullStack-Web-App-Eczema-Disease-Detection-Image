@@ -58,8 +58,9 @@ async def lifespan(app: FastAPI):
         
         # Official Google Gemini API key from AI Studio (https://aistudio.google.com/app)
         gemini_api_key = os.getenv("GEMINI_API_KEY")
-        # Available models: gemma-3-27b-it, gemma-3-12b-it, gemma-3-4b-it, gemma-3-2b-it, gemma-3-1b-it, gemini-2.5-flash
-        gemini_model = os.getenv("GEMINI_MODEL", "gemma-3-27b-it")
+        # Available VISION models: gemini-1.5-pro (best accuracy), gemini-1.5-flash (fast), gemini-2.0-flash-exp (latest)
+        # IMPORTANT: Gemma models do NOT support vision! Use Gemini models for image analysis.
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
         llm_service = LLMService(gemini_api_key, gemini_model)
         
         image_processor = ImageProcessor()
@@ -292,13 +293,13 @@ async def analyze_image(file: UploadFile = File(...)):
                     severity = None
                 # Otherwise, keep the model's Eczema prediction
                     
-            # CASE 2: Model says Normal (<40% probability)
+            # CASE 2: Model says Normal (<20% probability)
             elif prediction_state == "Normal":
                 # Model thinks it's normal, but check if Gemini sees eczema
                 if gemini_assessment == True:
-                    # Gemini detected eczema - but only trust if VERY confident
-                    # and model probability wasn't extremely low
-                    if gemini_confidence and gemini_confidence >= 0.75 and eczema_probability >= 0.20:
+                    # Gemini detected eczema - trust Gemini more for eczema detection
+                    # Lower threshold to catch more eczema cases
+                    if gemini_confidence and gemini_confidence >= 0.70 and eczema_probability >= 0.15:
                         print("\n✅ GEMINI DETECTED ECZEMA (model gave low probability)")
                         print(f"   Model: {eczema_probability:.2%}, Gemini: {gemini_confidence:.2%}")
                         prediction_state = "Eczema"
@@ -309,8 +310,8 @@ async def analyze_image(file: UploadFile = File(...)):
                             gemini_confidence,
                             {"eczema_probability": gemini_confidence}
                         )
-                    elif gemini_confidence and gemini_confidence >= 0.85:
-                        # Very high Gemini confidence, even if model was very low
+                    elif gemini_confidence and gemini_confidence >= 0.80:
+                        # High Gemini confidence, even if model was very low
                         print("\n✅ GEMINI DETECTED ECZEMA (high confidence override)")
                         prediction_state = "Eczema"
                         final_confidence = gemini_confidence
@@ -322,10 +323,12 @@ async def analyze_image(file: UploadFile = File(...)):
                         )
                 # If Gemini also says normal (False), keep Normal
                     
-            # CASE 3: Model is Uncertain (40-60% probability)
+            # CASE 3: Model is Uncertain (20-35% probability)
             elif prediction_state == "Uncertain":
-                if gemini_assessment == True and gemini_confidence and gemini_confidence >= 0.70:
+                # For uncertain cases, trust Gemini more - lower threshold
+                if gemini_assessment == True and gemini_confidence and gemini_confidence >= 0.65:
                     print("\n✅ GEMINI RESOLVED UNCERTAINTY: Detected eczema")
+                    print(f"   Model: {eczema_probability:.2%}, Gemini: {gemini_confidence:.2%}")
                     prediction_state = "Eczema"
                     final_confidence = gemini_confidence
                     final_eczema_detected = True
@@ -340,6 +343,19 @@ async def analyze_image(file: UploadFile = File(...)):
                     final_confidence = gemini_confidence
                     final_eczema_detected = False
                     severity = None
+        
+        # ============================================
+        # FALLBACK: When Gemini fails, be more conservative for borderline cases
+        # ============================================
+        if gemini_assessment is None and prediction_state == "Normal" and 0.20 <= eczema_probability < 0.40:
+            # Gemini failed but model gave borderline probability (20-40%)
+            # Be conservative: mark as Uncertain rather than Normal (might be eczema)
+            print(f"\n⚠️ GEMINI FAILED - Conservative fallback: Borderline probability ({eczema_probability:.2%}) marked as Uncertain")
+            prediction_state = "Uncertain"
+            final_confidence = 0.5
+            final_eczema_detected = False
+            severity = None
+            uncertainty_reason = "Gemini analysis unavailable. Model probability is in borderline range (20-40%)."
         
         # Build reasoning string
         reasoning_parts = []
